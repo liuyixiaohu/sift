@@ -1,14 +1,12 @@
 /* === Profile page cleanup styles (toggled via body classes) === */
 
 /* Hide right sidebar (ads, recommendations, "People you may know", etc.) */
-body.lj-hide-profile-sidebar aside[role="complementary"],
-body.lj-hide-profile-sidebar [role="complementary"]:not(main):not([role="main"]) {
+body.lj-hide-profile-sidebar aside.scaffold-layout__aside {
   display: none !important;
 }
 
 /* Hide footer */
-body.lj-hide-profile-sidebar footer[aria-label="LinkedIn Footer Content"],
-body.lj-hide-profile-sidebar [role="contentinfo"][aria-label="LinkedIn Footer Content"] {
+body.lj-hide-profile-sidebar footer.global-footer {
   display: none !important;
 }
 

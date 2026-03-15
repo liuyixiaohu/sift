@@ -33,11 +33,7 @@
     skippedCompany: "Skipped Co.", skippedTitle: "Skipped Title",
     unpaid: "Unpaid",
   };
-  const BADGE_COLORS = {
-    reposted: "#D9797B", applied: "#D9797B", noSponsor: "#D9797B",
-    skippedCompany: "#D9797B", skippedTitle: "#D9797B",
-    unpaid: "#D9797B",
-  };
+  const BADGE_COLOR = "#D9797B";
   // Border color priority (first matching reason determines border color)
   const BORDER_PRIORITY = ["noSponsor", "reposted", "skippedCompany", "skippedTitle", "applied", "unpaid"];
 
@@ -360,7 +356,7 @@
     // Set border + position on visible element (inline style)
     target.style.position = "relative";
     target.style.overflow = "visible";
-    target.style.borderLeft = "3px solid " + (BADGE_COLORS[getBorderReason(reasons)] || "#D9797B");
+    target.style.borderLeft = "3px solid " + (BADGE_COLOR);
 
     const container = document.createElement("div");
     container.className = "lj-badges";
@@ -370,7 +366,7 @@
       const badge = document.createElement("span");
       badge.className = "lj-badge";
       badge.textContent = BADGE_DISPLAY[reason] || reason;
-      badge.style.background = BADGE_COLORS[reason];
+      badge.style.background = BADGE_COLOR;
       container.appendChild(badge);
     });
 

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "JobLens",
-  "version": "1.1",
-  "description": "Smart LinkedIn job filter: flags Reposted, Applied, No Sponsor, Unpaid, and lets you skip companies & title keywords.",
+  "version": "1.2",
+  "description": "Clean up LinkedIn: filter jobs, hide feed ads & distractions, mute people & keywords, and declutter profile pages.",
   "permissions": ["storage"],
   "content_scripts": [
     {

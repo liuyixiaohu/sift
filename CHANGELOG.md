@@ -1,5 +1,30 @@
 # Changelog
 
+## v1.2
+
+### Feed Page
+- Control panel with toggle switches: Hide Ads, Suggested, Recommended, Strangers, Force Recent, Hide Sidebar
+- Mute by person name — "Mute" button appears on hover next to author and interactor names
+- Mute by keyword — hide posts containing specific terms
+- Hide LinkedIn Learning promotions ("Popular course on LinkedIn Learning")
+- Hide non-connection (stranger) posts from feed
+- Force Recent sort — automatically switches feed to Recent via sort dropdown
+- Hide LinkedIn News sidebar and footer
+- Persistent settings via chrome.storage.local
+
+### Profile Page
+- Hide right sidebar on `/in/*` pages (ads, "People you may know", "More profiles for you", etc.)
+- Separate frosted-glass control panel with Hide Sidebar toggle
+
+### Performance
+- Single-pass DOM scanning (5x → 1x traversal per post for label detection)
+- MutationObserver narrowed from document.body to `<main>` element
+- Cached mute lookups via Set (O(1) instead of O(n) per post)
+- Font loading moved from JS runtime to CSS @import (loads at document_start)
+- Targeted selectors in cardHasAppliedText() instead of querySelectorAll("*")
+
+---
+
 ## v1.1
 
 ### Bug Fixes

@@ -6,13 +6,22 @@
   // Bail out silently to avoid "Cannot read properties of undefined" errors.
   if (!chrome.runtime?.id) return;
 
-  // Load EB Garamond font (non-blocking <link> instead of CSS @import)
-  if (!document.querySelector('link[href*="EB+Garamond"]')) {
-    const link = document.createElement("link");
-    link.rel = "stylesheet";
-    link.href = "https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;600;700&display=swap";
-    document.head.appendChild(link);
-  }
+  // EB Garamond font is loaded once by content.js (both scripts share the page)
+
+  // === Tuning constants ===
+  const MIN_FEED_IFRAME_WIDTH = 500;  // px — ignore narrow iframes (ads, widgets)
+  const OBSERVER_DEBOUNCE_MS = 300;   // debounce for MutationObserver callback
+  const MAIN_POLL_INTERVAL_MS = 1500; // poll interval when waiting for <main>
+  const MAIN_POLL_MAX_RETRIES = 20;   // max retries before giving up on <main>
+  const IFRAME_POLL_INTERVAL_MS = 1000;
+  const IFRAME_POLL_MAX_TICKS = 20;
+  const SIDEBAR_POLL_INTERVAL_MS = 2000;
+  const SIDEBAR_POLL_MAX_TICKS = 15;
+  const SPA_POLL_INTERVAL_MS = 1000;  // URL change detection interval
+  const UNFOLLOW_CHECK_INTERVAL_MS = 500;
+  const UNFOLLOW_MAX_CHECKS = 20;
+  const UNFOLLOW_COLLAPSE_DELAY_MS = 1200;
+  const SCROLL_NUDGE_DELAY_MS = 400;
 
   function isFeedPage() {
     const p = location.pathname;
@@ -25,7 +34,6 @@
   // Content scripts only run in the top frame, so we detect the iframe and
   // redirect all DOM queries to the correct document via `feedDoc`.
   let feedDoc = document;
-  const MIN_FEED_IFRAME_WIDTH = 500;
 
   function updateFeedDoc() {
     for (const iframe of document.querySelectorAll("iframe")) {
@@ -39,14 +47,8 @@
   }
 
   // === Storage ===
-  const DEFAULTS = {
-    hidePromoted: true,
-    hideSuggested: true,
-    hideRecommended: true,
-    hideNonConnections: false,
-    hideSidebar: true,
-  };
-  const SETTING_KEYS = new Set(Object.keys(DEFAULTS));
+  const DEFAULTS = window.__siftDefaults || {};
+  const SETTING_KEYS = new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar"]);
   let settings = { ...DEFAULTS };
 
   function loadSettings(cb) {
@@ -63,7 +65,7 @@
     nudgeTimer = setTimeout(() => {
       window.scrollBy(0, 1);
       requestAnimationFrame(() => window.scrollBy(0, -1));
-    }, 400);
+    }, SCROLL_NUDGE_DELAY_MS);
   }
 
   // === Filtering logic ===
@@ -75,10 +77,14 @@
 
   function detectPostLabels(article) {
     const found = new Set();
+    // LinkedIn renders these labels in span/a/p leaf nodes. Short-circuit once all found.
     for (const el of article.querySelectorAll("span, a, p")) {
       if (el.children.length > 0) continue;
       const t = el.textContent.trim();
-      if (POST_TYPE_LABELS.has(t)) found.add(t);
+      if (POST_TYPE_LABELS.has(t)) {
+        found.add(t);
+        if (found.size === POST_TYPE_LABELS.size) break;
+      }
     }
     return found;
   }
@@ -94,10 +100,8 @@
     const batch = pendingStats;
     pendingStats = {};
     if (Object.keys(batch).length === 0) return;
-    chrome.storage.local.get({
-      stats: { today: "", adsHidden: 0, suggestedHidden: 0, recommendedHidden: 0, strangersHidden: 0, jobsFlagged: 0, jobsScanned: 0 },
-      statsAllTime: { adsHidden: 0, suggestedHidden: 0, recommendedHidden: 0, strangersHidden: 0, jobsFlagged: 0, jobsScanned: 0 },
-    }, (data) => {
+    const statsDefaults = window.__siftStatsDefaults || {};
+    chrome.storage.local.get(statsDefaults, (data) => {
       const today = new Date().toISOString().slice(0, 10);
       if (data.stats.today !== today) {
         data.stats = { today, adsHidden: 0, suggestedHidden: 0, recommendedHidden: 0, strangersHidden: 0, jobsFlagged: 0, jobsScanned: 0 };
@@ -116,6 +120,8 @@
 
   // Scan and tag all posts, then flush stats in a single storage write
   function scanPosts() {
+    // Guard against stale feedDoc (iframe removed or replaced)
+    if (feedDoc !== document && !feedDoc.defaultView) updateFeedDoc();
     const main = feedMain();
     if (!main) return;
     const articles = main.querySelectorAll('[role="article"]');
@@ -171,7 +177,7 @@
   function watchForUnfollowConfirmation(article) {
     let checks = 0;
     const interval = setInterval(() => {
-      if (++checks > 20) { clearInterval(interval); return; }
+      if (++checks > UNFOLLOW_MAX_CHECKS || !article.isConnected) { clearInterval(interval); return; }
       // LinkedIn replaces the post content with "You unfollowed ..."
       if (article.textContent.includes("You unfollowed")) {
         clearInterval(interval);
@@ -182,9 +188,9 @@
           article.style.padding = "0";
           article.style.margin = "0";
           article.style.transition = "max-height 0.3s, opacity 0.2s, padding 0.3s, margin 0.3s";
-        }, 1200);
+        }, UNFOLLOW_COLLAPSE_DELAY_MS);
       }
-    }, 500);
+    }, UNFOLLOW_CHECK_INTERVAL_MS);
   }
 
   function injectUnfollowButtons() {
@@ -363,8 +369,8 @@
     let ticks = 0;
     sidebarInterval = setInterval(() => {
       hideSidebarElements();
-      if (++ticks >= 15) clearInterval(sidebarInterval);
-    }, 2000);
+      if (++ticks >= SIDEBAR_POLL_MAX_TICKS) clearInterval(sidebarInterval);
+    }, SIDEBAR_POLL_INTERVAL_MS);
   }
 
   function injectSidebarStyle() {
@@ -419,7 +425,7 @@
         injectUnfollowButtons();
         updateBadgeCount();
         nudgeScroll();
-      }, 300);
+      }, OBSERVER_DEBOUNCE_MS);
     });
 
     if (mainEl) {
@@ -436,8 +442,8 @@
           feedObserver.observe(m, { childList: true, subtree: true });
           applyFeed();
         }
-        if (++retries >= 20) clearInterval(mainPollInterval);
-      }, 1500);
+        if (++retries >= MAIN_POLL_MAX_RETRIES) clearInterval(mainPollInterval);
+      }, MAIN_POLL_INTERVAL_MS);
     }
   }
 
@@ -495,8 +501,8 @@
         clearInterval(iframeCheckInterval);
         return;
       }
-      if (++ticks >= 20) clearInterval(iframeCheckInterval);
-    }, 1000);
+      if (++ticks >= IFRAME_POLL_MAX_TICKS) clearInterval(iframeCheckInterval);
+    }, IFRAME_POLL_INTERVAL_MS);
   }
 
   // Boot immediately if on feed page
@@ -525,5 +531,5 @@
         if (feedObserver) feedObserver.disconnect();
       }
     }
-  }, 1000);
+  }, SPA_POLL_INTERVAL_MS);
 })();

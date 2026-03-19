@@ -78,16 +78,18 @@
   }
 
   // ==================== Storage ====================
+  const _defaults = window.__siftDefaults || {};
+
   async function loadSettings() {
     const data = await chrome.storage.local.get({
-      skippedCompanies: [],
-      skippedTitleKeywords: [],
-      sponsorCheckEnabled: true,
-      unpaidCheckEnabled: true,
+      skippedCompanies: _defaults.skippedCompanies || [],
+      skippedTitleKeywords: _defaults.skippedTitleKeywords || [],
+      sponsorCheckEnabled: _defaults.sponsorCheckEnabled ?? true,
+      unpaidCheckEnabled: _defaults.unpaidCheckEnabled ?? true,
       hasSeenIntro: false,
       panelPosition: null,
-      dimFiltered: false,
-      hideFiltered: false,
+      dimFiltered: _defaults.dimFiltered ?? false,
+      hideFiltered: _defaults.hideFiltered ?? false,
     });
     skippedCompanies = data.skippedCompanies;
     skippedTitleKeywords = data.skippedTitleKeywords;
@@ -103,14 +105,30 @@
     chrome.storage.local.set({ [key]: value });
   }
 
-  // Increment a stat counter (today + all-time). Writes only to stats keys,
-  // which the onChanged listener explicitly ignores to prevent feedback loops.
+  // Batched stat counter — accumulates increments and flushes in a single
+  // storage write to avoid per-card I/O during scans.
+  let pendingStats = {};
+  let flushTimer = null;
+
   function incrementStat(key, amount = 1) {
+    pendingStats[key] = (pendingStats[key] || 0) + amount;
+    if (!flushTimer) {
+      flushTimer = setTimeout(flushStats, 500);
+    }
+  }
+
+  function flushStats() {
+    flushTimer = null;
+    const batch = pendingStats;
+    pendingStats = {};
+    if (Object.keys(batch).length === 0) return;
     chrome.storage.local.get({ stats: {}, statsAllTime: {} }, (d) => {
       const today = new Date().toISOString().slice(0, 10);
       if (d.stats.today !== today) d.stats = { today };
-      d.stats[key] = (d.stats[key] || 0) + amount;
-      d.statsAllTime[key] = (d.statsAllTime[key] || 0) + amount;
+      for (const [key, count] of Object.entries(batch)) {
+        d.stats[key] = (d.stats[key] || 0) + count;
+        d.statsAllTime[key] = (d.statsAllTime[key] || 0) + count;
+      }
       chrome.storage.local.set({ stats: d.stats, statsAllTime: d.statsAllTime });
     });
   }
@@ -122,7 +140,7 @@
       Object.entries(attrs).forEach(([k, v]) => {
         if (k === 'className') e.className = v;
         else if (k === 'textContent') e.textContent = v;
-        else if (k.startsWith('on')) e.addEventListener(k.slice(2).toLowerCase(), v);
+        else if (k.startsWith('on') && k.length > 2 && k[2] === k[2].toUpperCase()) e.addEventListener(k.slice(2).toLowerCase(), v);
         else e.setAttribute(k, v);
       });
     }
@@ -604,7 +622,7 @@
   function injectStyles() {
     if (document.getElementById("lj-filter-styles")) return;
     // Load EB Garamond via <link> tag (avoids @import being blocked by CSP)
-    if (!document.getElementById("lj-font-link")) {
+    if (!document.getElementById("lj-font-link") && !document.querySelector('link[href*="EB+Garamond"]')) {
       const link = document.createElement("link");
       link.id = "lj-font-link";
       link.rel = "stylesheet";
@@ -1071,9 +1089,10 @@
     window.addEventListener("load", () => setTimeout(init, 1500));
   }
 
-  // ==================== Keyboard Shortcut (Ctrl/Cmd + Shift + J) ====================
+  // ==================== Keyboard Shortcut (Ctrl/Cmd + Shift + S) ====================
+  // Changed from J to S to avoid conflict with Chrome DevTools (Ctrl+Shift+J)
   document.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "J" || e.key === "j")) {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "S" || e.key === "s")) {
       e.preventDefault();
       const panel = document.getElementById("lj-filter-panel");
       if (panel) {

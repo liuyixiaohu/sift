@@ -16,7 +16,7 @@
     },
     {
       "matches": ["https://www.linkedin.com/*"],
-      "js": ["content.js", "feed.js"],
+      "js": ["defaults.js", "content.js", "feed.js"],
       "run_at": "document_idle"
     }
   ],

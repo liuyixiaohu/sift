@@ -151,7 +151,7 @@
   function makeUnfollowBtn(article) {
     const btn = feedDoc.createElement("button");
     btn.className = "lj-unfollow-btn";
-    btn.title = "Open menu to unfollow";
+    btn.title = "Unfollow — refresh page to clear remaining posts";
     btn.textContent = "Unfollow";
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -429,38 +429,51 @@
       // freezes LinkedIn due to heavy DOM activity (see project memory).
       let retries = 0;
       mainPollInterval = setInterval(() => {
+        updateFeedDoc();
         const m = feedMain();
         if (m) {
           clearInterval(mainPollInterval);
           feedObserver.observe(m, { childList: true, subtree: true });
-          scanPosts();
-          injectUnfollowButtons();
-          updateBadgeCount();
+          applyFeed();
         }
-        if (++retries >= 15) clearInterval(mainPollInterval);
-      }, 2000);
+        if (++retries >= 20) clearInterval(mainPollInterval);
+      }, 1500);
     }
   }
 
-  // === Re-apply all features (used after iframe detection or SPA navigation) ===
-  function reapply() {
+  // === Apply features that don't need <main> ===
+  function applyShell() {
     updateFeedDoc();
     injectFeedCssIntoIframe();
     applyBodyClasses();
     if (settings.hideSidebar) { injectSidebarStyle(); enforceSidebarHidden(); }
+    createMiniBadge();
+  }
+
+  // === Apply features that need <main> ===
+  function applyFeed() {
     scanPosts();
     injectUnfollowButtons();
-    createMiniBadge();
     updateBadgeCount();
+  }
+
+  // === Re-apply all features (used after iframe detection or SPA navigation) ===
+  function reapply() {
+    applyShell();
+    applyFeed();
     setupObserver();
   }
 
   // === Init ===
+  let booting = false;
+
   function boot() {
-    if (initialized || !isFeedPage()) return;
-    initialized = true;
+    if (initialized || booting || !isFeedPage()) return;
+    booting = true;
 
     loadSettings(() => {
+      initialized = true;
+      booting = false;
       reapply();
       // Iframe may not be ready yet on initial load — poll for it
       startIframeCheck();
@@ -482,7 +495,7 @@
         clearInterval(iframeCheckInterval);
         return;
       }
-      if (++ticks >= 10) clearInterval(iframeCheckInterval);
+      if (++ticks >= 20) clearInterval(iframeCheckInterval);
     }, 1000);
   }
 
@@ -496,12 +509,13 @@
     if (location.href !== lastUrl) {
       lastUrl = location.href;
       if (isFeedPage()) {
-        if (!initialized) {
+        if (!initialized && !booting) {
           boot();
-        } else {
+        } else if (initialized) {
           reapply();
           startIframeCheck();
         }
+        // if booting, do nothing — boot() callback will finish init
       } else {
         initialized = false;
         feedDoc = document;

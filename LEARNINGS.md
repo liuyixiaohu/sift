@@ -373,3 +373,62 @@ Jobs 面板快捷键从 `Ctrl/Cmd+Shift+J` 改为 `Ctrl/Cmd+Shift+S`，避免与
 ### feed.js 常量提取
 
 所有轮询间隔、最大重试次数、防抖时间等魔法数字提取为文件顶部的命名常量，便于调优和理解。
+
+---
+
+## 18. ES Modules + esbuild 迁移 (v2.3)
+
+Chrome extension content scripts 不支持 `type: "module"`（manifest 的 `content_scripts.js` 数组只能引用传统脚本）。因此需要 bundler 将 ES module 源码打包为 IIFE 格式。
+
+**技术选型**：esbuild 的 `format: "iife"` + `bundle: true`，4 个 entry points 各自输出独立的 IIFE bundle。
+
+**迁移要点**：
+- `window.__siftDefaults` 全局变量 → `export/import` + bundler 内联
+- 早期退出守卫 `if (!chrome.runtime?.id) return;` 在移除 IIFE 后改为 `if (chrome.runtime?.id) { ... }` 包裹整个文件体
+- 构建产物提交到 repo（Chrome 扩展需直接 Load Unpacked，不跑 build 步骤）
+- `popup.html` 移除 `<script src="defaults.js">` tag，因为 defaults 已内联到 popup.js bundle 中
+- manifest 的 `content_scripts.js` 移除 `defaults.js`（已被各 bundle 内含）
+
+---
+
+## 19. Feed 关键词过滤的重新评估策略
+
+Type labels（Promoted / Suggested / Recommended）是帖子的固有属性——检测一次后标记 `data-lj-type-checked`，永不重新评估。
+
+关键词过滤不同：用户可以随时添加或删除关键词。关键词变化时，已标记的帖子必须重新评估：
+- 新增关键词 → 之前未匹配的帖子可能需要隐藏
+- 删除关键词 → 之前匹配的帖子应该恢复可见
+
+**实现**：用独立的 `data-lj-keyword-checked` 标记（与 `data-lj-type-checked` 分离）。当 `storage.onChanged` 检测到 `feedKeywords` 变化时，清除所有 article 的 `ljKeywordChecked` 和 `ljKeywordFiltered`，然后 re-scan。
+
+**性能考量**：LinkedIn feed 虚拟列表通常只有 20-50 个 article 在 DOM 中，清除+重扫成本可忽略。
+
+---
+
+## 20. History API 包装链
+
+多个脚本可以链式包装 `history.pushState` / `history.replaceState`。每个包装器存储调用时的"当前版本"作为 original，形成链式调用：
+
+```
+用户调用 pushState
+  → feed.js wrapper（后加载）触发 handleFeedRouteChange
+    → content.js wrapper（先加载）触发 handleRouteChange
+      → 浏览器原始 pushState
+```
+
+**关键点**：
+- 加载顺序决定包装顺序（manifest `content_scripts.js` 数组中 content.js 在 feed.js 前面）
+- 两个 handler 各自检查自己的页面类型（`isSearchPage()` vs `isFeedPage()`），互不干扰
+- URL 轮询降为 3s fallback，仅覆盖 History API 覆盖不到的边缘情况
+
+---
+
+## 21. Extension Icon Badge 的 Tab 隔离
+
+`chrome.action.setBadgeText` 支持 `tabId` 参数，每个 tab 可以显示不同的 badge text。
+
+**架构限制**：Content scripts 无法直接调用 `chrome.action` API，必须通过 `chrome.runtime.sendMessage` 将计数发送给 background service worker，由 service worker 调用 `chrome.action.setBadgeText({ text, tabId })`。
+
+**Fire-and-forget 模式**：`sendMessage` 不等待响应。用 `try/catch` 包裹，因为 service worker 可能在 extension 更新后处于 inactive 状态。发送失败不影响页面功能。
+
+**清零策略**：离开 feed 或 jobs 页面时主动发送 `count: 0`，确保 badge 不显示过时数据。

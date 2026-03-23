@@ -11,6 +11,8 @@
     feedKeywordFilterEnabled: true,
     feedKeywords: [],
     hasSeenOnboarding: false,
+    // Profile page
+    hideProfileAnalytics: true,
     // Jobs page
     sponsorCheckEnabled: true,
     unpaidCheckEnabled: true,
@@ -66,6 +68,8 @@
     let isFeedPage = function() {
       const p = location.pathname;
       return p === "/" || p.startsWith("/feed");
+    }, isProfilePage = function() {
+      return /^\/in\/[^/]+\/?$/.test(location.pathname);
     }, updateFeedDoc = function() {
       for (const iframe of document.querySelectorAll("iframe")) {
         if (iframe.offsetWidth < MIN_FEED_IFRAME_WIDTH) continue;
@@ -320,6 +324,17 @@
       const tip = feedDoc.getElementById("lj-badge-tip");
       if (tip && tip.classList.contains("visible")) updateBreakdown();
       sendBadgeCount(count);
+    }, applyProfileClasses = function() {
+      document.body.classList.toggle("lj-hide-sidebar", settings.hideSidebar);
+      document.body.classList.toggle("lj-hide-profile-analytics", settings.hideProfileAnalytics);
+    }, bootProfile = function() {
+      if (profileInitialized) return;
+      profileInitialized = true;
+      loadSettings(() => applyProfileClasses());
+    }, teardownProfile = function() {
+      if (!profileInitialized) return;
+      profileInitialized = false;
+      document.body.classList.remove("lj-hide-sidebar", "lj-hide-profile-analytics");
     }, applyBodyClasses = function() {
       feedDoc.body.classList.toggle("lj-hide-promoted", settings.hidePromoted);
       feedDoc.body.classList.toggle("lj-hide-suggested", settings.hideSuggested);
@@ -448,6 +463,11 @@
     }, handleFeedRouteChange = function() {
       if (location.href === lastUrl) return;
       lastUrl = location.href;
+      if (isProfilePage()) {
+        bootProfile();
+      } else {
+        teardownProfile();
+      }
       if (isFeedPage()) {
         if (!initialized && !booting) {
           boot();
@@ -482,7 +502,7 @@
     let initialized = false;
     let feedDoc = document;
     const DEFAULTS = SIFT_DEFAULTS;
-    const SETTING_KEYS = /* @__PURE__ */ new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "feedKeywordFilterEnabled", "feedKeywords"]);
+    const SETTING_KEYS = /* @__PURE__ */ new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "feedKeywordFilterEnabled", "feedKeywords", "hideProfileAnalytics"]);
     let settings = { ...DEFAULTS };
     let nudgeTimer = null;
     const POST_TYPE_LABELS = /* @__PURE__ */ new Set([
@@ -504,6 +524,7 @@
       }
     });
     let toastTimer = null;
+    let profileInitialized = false;
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       if (!Object.keys(changes).some((k) => SETTING_KEYS.has(k))) return;
@@ -511,6 +532,7 @@
         clearKeywordMarks();
       }
       loadSettings((s) => {
+        if (profileInitialized) applyProfileClasses();
         applyBodyClasses();
         if (s.hideSidebar) enforceSidebarHidden();
         else cleanupSidebarOverrides();
@@ -531,6 +553,7 @@
     let booting = false;
     let iframeCheckInterval = null;
     boot();
+    if (isProfilePage()) bootProfile();
     let lastUrl = location.href;
     window.addEventListener("popstate", handleFeedRouteChange);
     const origPushState = history.pushState;

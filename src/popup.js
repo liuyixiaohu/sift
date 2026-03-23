@@ -292,6 +292,20 @@ import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
 
     container.appendChild(feedGroup);
 
+    // --- Profile Controls ---
+    let profileGroup = document.createElement("div");
+    profileGroup.className = "section-group";
+    let profileTitle = document.createElement("div");
+    profileTitle.className = "section-title";
+    profileTitle.textContent = "Profile Page";
+    profileGroup.appendChild(profileTitle);
+
+    profileGroup.appendChild(createToggle("Hide Analytics", settings.hideProfileAnalytics, function (v) {
+      chrome.storage.local.set({ hideProfileAnalytics: v });
+    }));
+
+    container.appendChild(profileGroup);
+
     // --- Jobs Controls ---
     let jobsGroup = document.createElement("div");
     jobsGroup.className = "section-group";

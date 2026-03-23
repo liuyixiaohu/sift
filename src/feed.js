@@ -27,6 +27,10 @@ if (chrome.runtime?.id) {
     return p === "/" || p.startsWith("/feed");
   }
 
+  function isProfilePage() {
+    return /^\/in\/[^/]+\/?$/.test(location.pathname);
+  }
+
   let initialized = false;
 
   // LinkedIn SPA navigation may render the feed inside a same-origin iframe.
@@ -47,7 +51,7 @@ if (chrome.runtime?.id) {
 
   // === Storage ===
   const DEFAULTS = SIFT_DEFAULTS;
-  const SETTING_KEYS = new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "feedKeywordFilterEnabled", "feedKeywords"]);
+  const SETTING_KEYS = new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "feedKeywordFilterEnabled", "feedKeywords", "hideProfileAnalytics"]);
   let settings = { ...DEFAULTS };
 
   function loadSettings(cb) {
@@ -378,6 +382,26 @@ if (chrome.runtime?.id) {
     sendBadgeCount(count);
   }
 
+  // === Profile page: apply sidebar + analytics body classes ===
+  let profileInitialized = false;
+
+  function applyProfileClasses() {
+    document.body.classList.toggle("lj-hide-sidebar", settings.hideSidebar);
+    document.body.classList.toggle("lj-hide-profile-analytics", settings.hideProfileAnalytics);
+  }
+
+  function bootProfile() {
+    if (profileInitialized) return;
+    profileInitialized = true;
+    loadSettings(() => applyProfileClasses());
+  }
+
+  function teardownProfile() {
+    if (!profileInitialized) return;
+    profileInitialized = false;
+    document.body.classList.remove("lj-hide-sidebar", "lj-hide-profile-analytics");
+  }
+
   function applyBodyClasses() {
     feedDoc.body.classList.toggle("lj-hide-promoted", settings.hidePromoted);
     feedDoc.body.classList.toggle("lj-hide-suggested", settings.hideSuggested);
@@ -397,6 +421,7 @@ if (chrome.runtime?.id) {
       clearKeywordMarks();
     }
     loadSettings((s) => {
+      if (profileInitialized) applyProfileClasses();
       applyBodyClasses();
       if (s.hideSidebar) enforceSidebarHidden();
       else cleanupSidebarOverrides();
@@ -572,8 +597,9 @@ if (chrome.runtime?.id) {
     }, IFRAME_POLL_INTERVAL_MS);
   }
 
-  // Boot immediately if on feed page
+  // Boot immediately if on feed or profile page
   boot();
+  if (isProfilePage()) bootProfile();
 
   // === SPA navigation detection ===
   // Primary: intercept History API (immediate response).
@@ -583,6 +609,9 @@ if (chrome.runtime?.id) {
   function handleFeedRouteChange() {
     if (location.href === lastUrl) return;
     lastUrl = location.href;
+    // Profile page handling
+    if (isProfilePage()) { bootProfile(); } else { teardownProfile(); }
+    // Feed page handling
     if (isFeedPage()) {
       if (!initialized && !booting) {
         boot();

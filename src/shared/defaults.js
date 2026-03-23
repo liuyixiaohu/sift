@@ -11,6 +11,8 @@ export const SIFT_DEFAULTS = {
   feedKeywordFilterEnabled: true,
   feedKeywords: [],
   hasSeenOnboarding: false,
+  // Profile page
+  hideProfileAnalytics: true,
   // Jobs page
   sponsorCheckEnabled: true,
   unpaidCheckEnabled: true,

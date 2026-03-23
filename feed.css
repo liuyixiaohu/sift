@@ -9,6 +9,16 @@ body.lj-hide-sidebar [role="contentinfo"][aria-label="LinkedIn Footer Content"] 
   display: none !important;
 }
 
+/* Profile page: hide right sidebar (reuses hideSidebar toggle) */
+body.lj-hide-sidebar aside.scaffold-layout__aside {
+  display: none !important;
+}
+
+/* Profile page: hide Analytics section */
+body.lj-hide-profile-analytics section:has(a[href*="/dashboard"]) {
+  display: none !important;
+}
+
 /* Smooth collapse for filtered feed posts */
 body.lj-hide-promoted [data-lj-promoted="true"],
 body.lj-hide-suggested [data-lj-suggested="true"],

@@ -11,6 +11,8 @@
     feedKeywordFilterEnabled: true,
     feedKeywords: [],
     hasSeenOnboarding: false,
+    // Profile page
+    hideProfileAnalytics: true,
     // Jobs page
     sponsorCheckEnabled: true,
     unpaidCheckEnabled: true,
@@ -278,6 +280,16 @@
         kwInput.value = "";
       }
       container.appendChild(feedGroup);
+      let profileGroup = document.createElement("div");
+      profileGroup.className = "section-group";
+      let profileTitle = document.createElement("div");
+      profileTitle.className = "section-title";
+      profileTitle.textContent = "Profile Page";
+      profileGroup.appendChild(profileTitle);
+      profileGroup.appendChild(createToggle("Hide Analytics", settings.hideProfileAnalytics, function(v) {
+        chrome.storage.local.set({ hideProfileAnalytics: v });
+      }));
+      container.appendChild(profileGroup);
       let jobsGroup = document.createElement("div");
       jobsGroup.className = "section-group";
       let jobsTitle = document.createElement("div");

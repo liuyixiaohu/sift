@@ -19,6 +19,11 @@ body.lj-hide-profile-analytics section:has(a[href*="/dashboard"]) {
   display: none !important;
 }
 
+/* Hide upsell CTAs (Campaign Manager, etc.) */
+body.lj-hide-promoted footer.artdeco-card__actions:has(a[href*="/campaignmanager/"]) {
+  display: none !important;
+}
+
 /* Network page: hide game promo (reuses hidePromoted toggle) */
 body.lj-hide-network-game section:has(a[href*="/games/"]) {
   display: none !important;

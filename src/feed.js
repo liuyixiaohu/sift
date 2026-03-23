@@ -31,6 +31,10 @@ if (chrome.runtime?.id) {
     return /^\/in\/[^/]+\/?$/.test(location.pathname);
   }
 
+  function isNetworkPage() {
+    return location.pathname.startsWith("/mynetwork");
+  }
+
   let initialized = false;
 
   // LinkedIn SPA navigation may render the feed inside a same-origin iframe.
@@ -402,6 +406,40 @@ if (chrome.runtime?.id) {
     document.body.classList.remove("lj-hide-sidebar", "lj-hide-profile-analytics");
   }
 
+  // === Network page: hide sidebar ad + game promo ===
+  let networkInitialized = false;
+
+  function hideNetworkAds() {
+    // Hide ad iframe container (Promoted ad in left sidebar)
+    const adIframe = document.querySelector('iframe[src="about:blank"]');
+    if (adIframe) {
+      const adCard = adIframe.parentElement?.parentElement;
+      if (adCard && adCard.offsetWidth < 400) adCard.style.display = "none";
+    }
+    // Game promo is handled by CSS via body class
+    document.body.classList.toggle("lj-hide-network-game", settings.hidePromoted);
+  }
+
+  function bootNetwork() {
+    if (networkInitialized) return;
+    networkInitialized = true;
+    loadSettings(() => {
+      hideNetworkAds();
+      // Ad may load late — re-check a few times
+      let ticks = 0;
+      const interval = setInterval(() => {
+        hideNetworkAds();
+        if (++ticks >= 10) clearInterval(interval);
+      }, 2000);
+    });
+  }
+
+  function teardownNetwork() {
+    if (!networkInitialized) return;
+    networkInitialized = false;
+    document.body.classList.remove("lj-hide-network-game");
+  }
+
   function applyBodyClasses() {
     feedDoc.body.classList.toggle("lj-hide-promoted", settings.hidePromoted);
     feedDoc.body.classList.toggle("lj-hide-suggested", settings.hideSuggested);
@@ -422,6 +460,7 @@ if (chrome.runtime?.id) {
     }
     loadSettings((s) => {
       if (profileInitialized) applyProfileClasses();
+      if (networkInitialized) hideNetworkAds();
       applyBodyClasses();
       if (s.hideSidebar) enforceSidebarHidden();
       else cleanupSidebarOverrides();
@@ -597,9 +636,10 @@ if (chrome.runtime?.id) {
     }, IFRAME_POLL_INTERVAL_MS);
   }
 
-  // Boot immediately if on feed or profile page
+  // Boot immediately based on current page
   boot();
   if (isProfilePage()) bootProfile();
+  if (isNetworkPage()) bootNetwork();
 
   // === SPA navigation detection ===
   // Primary: intercept History API (immediate response).
@@ -611,6 +651,8 @@ if (chrome.runtime?.id) {
     lastUrl = location.href;
     // Profile page handling
     if (isProfilePage()) { bootProfile(); } else { teardownProfile(); }
+    // Network page handling
+    if (isNetworkPage()) { bootNetwork(); } else { teardownNetwork(); }
     // Feed page handling
     if (isFeedPage()) {
       if (!initialized && !booting) {

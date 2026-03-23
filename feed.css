@@ -19,6 +19,11 @@ body.lj-hide-profile-analytics section:has(a[href*="/dashboard"]) {
   display: none !important;
 }
 
+/* Network page: hide game promo (reuses hidePromoted toggle) */
+body.lj-hide-network-game section:has(a[href*="/games/"]) {
+  display: none !important;
+}
+
 /* Smooth collapse for filtered feed posts */
 body.lj-hide-promoted [data-lj-promoted="true"],
 body.lj-hide-suggested [data-lj-suggested="true"],

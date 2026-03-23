@@ -70,6 +70,8 @@
       return p === "/" || p.startsWith("/feed");
     }, isProfilePage = function() {
       return /^\/in\/[^/]+\/?$/.test(location.pathname);
+    }, isNetworkPage = function() {
+      return location.pathname.startsWith("/mynetwork");
     }, updateFeedDoc = function() {
       for (const iframe of document.querySelectorAll("iframe")) {
         if (iframe.offsetWidth < MIN_FEED_IFRAME_WIDTH) continue;
@@ -335,6 +337,28 @@
       if (!profileInitialized) return;
       profileInitialized = false;
       document.body.classList.remove("lj-hide-sidebar", "lj-hide-profile-analytics");
+    }, hideNetworkAds = function() {
+      const adIframe = document.querySelector('iframe[src="about:blank"]');
+      if (adIframe) {
+        const adCard = adIframe.parentElement?.parentElement;
+        if (adCard && adCard.offsetWidth < 400) adCard.style.display = "none";
+      }
+      document.body.classList.toggle("lj-hide-network-game", settings.hidePromoted);
+    }, bootNetwork = function() {
+      if (networkInitialized) return;
+      networkInitialized = true;
+      loadSettings(() => {
+        hideNetworkAds();
+        let ticks = 0;
+        const interval = setInterval(() => {
+          hideNetworkAds();
+          if (++ticks >= 10) clearInterval(interval);
+        }, 2e3);
+      });
+    }, teardownNetwork = function() {
+      if (!networkInitialized) return;
+      networkInitialized = false;
+      document.body.classList.remove("lj-hide-network-game");
     }, applyBodyClasses = function() {
       feedDoc.body.classList.toggle("lj-hide-promoted", settings.hidePromoted);
       feedDoc.body.classList.toggle("lj-hide-suggested", settings.hideSuggested);
@@ -468,6 +492,11 @@
       } else {
         teardownProfile();
       }
+      if (isNetworkPage()) {
+        bootNetwork();
+      } else {
+        teardownNetwork();
+      }
       if (isFeedPage()) {
         if (!initialized && !booting) {
           boot();
@@ -525,6 +554,7 @@
     });
     let toastTimer = null;
     let profileInitialized = false;
+    let networkInitialized = false;
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       if (!Object.keys(changes).some((k) => SETTING_KEYS.has(k))) return;
@@ -533,6 +563,7 @@
       }
       loadSettings((s) => {
         if (profileInitialized) applyProfileClasses();
+        if (networkInitialized) hideNetworkAds();
         applyBodyClasses();
         if (s.hideSidebar) enforceSidebarHidden();
         else cleanupSidebarOverrides();
@@ -554,6 +585,7 @@
     let iframeCheckInterval = null;
     boot();
     if (isProfilePage()) bootProfile();
+    if (isNetworkPage()) bootNetwork();
     let lastUrl = location.href;
     window.addEventListener("popstate", handleFeedRouteChange);
     const origPushState = history.pushState;

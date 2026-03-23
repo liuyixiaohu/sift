@@ -13,6 +13,7 @@ Clean up LinkedIn: filter feed by keywords, hide ads & spam, mute or unfollow in
 - **Hide Strangers** (non-connection posts)
 - **Keyword Filter** — define custom keywords to hide matching posts
 - **Hide Polls** — filter out LinkedIn polls
+- **Hide Celebrations** — hide job updates, work anniversaries, birthdays, promotions
 - **Hide Old Posts** — hide posts older than 1 day / 3 days / 1 week / 2 weeks / 1 month
 - **Hide Sidebar** (LinkedIn News + footer)
 - **Hide Upsells** — removes "Try Campaign Manager" and similar promotions

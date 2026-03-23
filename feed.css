@@ -35,6 +35,7 @@ body.lj-hide-suggested [data-lj-suggested="true"],
 body.lj-hide-recommended [data-lj-recommended="true"],
 body.lj-hide-non-connections [data-lj-non-connection="true"],
 body.lj-hide-polls [data-lj-poll="true"],
+body.lj-hide-celebrations [data-lj-celebration="true"],
 body.lj-hide-keyword-filtered [data-lj-keyword-filtered="true"],
 body.lj-hide-old-posts [data-lj-too-old="true"] {
   max-height: 0 !important;

@@ -8,6 +8,7 @@
     hideNonConnections: false,
     hideSidebar: true,
     hidePolls: false,
+    hideCelebrations: false,
     feedKeywordFilterEnabled: true,
     feedKeywords: [],
     postAgeLimit: 0,
@@ -31,6 +32,7 @@
       recommendedHidden: 0,
       strangersHidden: 0,
       pollsHidden: 0,
+      celebrationsHidden: 0,
       keywordsHidden: 0,
       jobsFlagged: 0,
       jobsScanned: 0
@@ -41,6 +43,7 @@
       recommendedHidden: 0,
       strangersHidden: 0,
       pollsHidden: 0,
+      celebrationsHidden: 0,
       keywordsHidden: 0,
       jobsFlagged: 0,
       jobsScanned: 0
@@ -58,6 +61,7 @@
       recommendedHidden: "Recommended Hidden",
       strangersHidden: "Strangers Hidden",
       pollsHidden: "Polls Hidden",
+      celebrationsHidden: "Celebrations Hidden",
       jobsFlagged: "Jobs Flagged",
       keywordsHidden: "Keywords Hidden",
       jobsScanned: "Jobs Scanned"
@@ -228,6 +232,9 @@
       }));
       feedGroup.appendChild(createToggle("Hide Polls", settings.hidePolls, function(v) {
         chrome.storage.local.set({ hidePolls: v });
+      }));
+      feedGroup.appendChild(createToggle("Hide Celebrations", settings.hideCelebrations, function(v) {
+        chrome.storage.local.set({ hideCelebrations: v });
       }));
       let ageRow = document.createElement("div");
       ageRow.className = "toggle-row";

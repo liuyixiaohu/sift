@@ -14,6 +14,7 @@ import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
     recommendedHidden: "Recommended Hidden",
     strangersHidden: "Strangers Hidden",
     pollsHidden: "Polls Hidden",
+    celebrationsHidden: "Celebrations Hidden",
     jobsFlagged: "Jobs Flagged",
     keywordsHidden: "Keywords Hidden",
     jobsScanned: "Jobs Scanned",
@@ -234,6 +235,9 @@ import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
     }));
     feedGroup.appendChild(createToggle("Hide Polls", settings.hidePolls, function (v) {
       chrome.storage.local.set({ hidePolls: v });
+    }));
+    feedGroup.appendChild(createToggle("Hide Celebrations", settings.hideCelebrations, function (v) {
+      chrome.storage.local.set({ hideCelebrations: v });
     }));
 
     // Post age filter

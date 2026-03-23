@@ -8,6 +8,7 @@
     hideNonConnections: false,
     hideSidebar: true,
     hidePolls: false,
+    hideCelebrations: false,
     feedKeywordFilterEnabled: true,
     feedKeywords: [],
     postAgeLimit: 0,
@@ -31,6 +32,7 @@
       recommendedHidden: 0,
       strangersHidden: 0,
       pollsHidden: 0,
+      celebrationsHidden: 0,
       keywordsHidden: 0,
       jobsFlagged: 0,
       jobsScanned: 0
@@ -41,6 +43,7 @@
       recommendedHidden: 0,
       strangersHidden: 0,
       pollsHidden: 0,
+      celebrationsHidden: 0,
       keywordsHidden: 0,
       jobsFlagged: 0,
       jobsScanned: 0
@@ -139,6 +142,16 @@
           break;
         }
       }
+      const header = article.querySelector(".update-components-header");
+      const headerText = header ? header.textContent.toLowerCase() : "";
+      if (CELEBRATION_PATTERNS.some((p) => headerText.includes(p))) {
+        types.add("celebration");
+      } else {
+        const fullText = article.textContent.toLowerCase();
+        if (CELEBRATION_PATTERNS.some((p) => fullText.includes(p))) {
+          types.add("celebration");
+        }
+      }
       return types;
     }, incrementStat = function(key) {
       pendingStats[key] = (pendingStats[key] || 0) + 1;
@@ -194,6 +207,10 @@
           if (contentTypes.has("poll")) {
             article.dataset.ljPoll = "true";
             if (settings.hidePolls) incrementStat("pollsHidden");
+          }
+          if (contentTypes.has("celebration")) {
+            article.dataset.ljCelebration = "true";
+            if (settings.hideCelebrations) incrementStat("celebrationsHidden");
           }
         }
         if (settings.feedKeywordFilterEnabled && settings.feedKeywords && settings.feedKeywords.length > 0) {
@@ -295,6 +312,7 @@
           "lj-hide-non-connections",
           "lj-hide-sidebar",
           "lj-hide-polls",
+          "lj-hide-celebrations",
           "lj-hide-keyword-filtered",
           "lj-hide-old-posts"
         );
@@ -355,6 +373,7 @@
         Recommended: feedDoc.querySelectorAll('[data-lj-recommended="true"]').length,
         Strangers: feedDoc.querySelectorAll('[data-lj-non-connection="true"]').length,
         Polls: feedDoc.querySelectorAll('[data-lj-poll="true"]').length,
+        Celebrations: feedDoc.querySelectorAll('[data-lj-celebration="true"]').length,
         Keywords: feedDoc.querySelectorAll('[data-lj-keyword-filtered="true"]').length,
         "Too Old": feedDoc.querySelectorAll('[data-lj-too-old="true"]').length
       };
@@ -363,7 +382,7 @@
     }, updateBadgeCount = function() {
       const badge = feedDoc.getElementById("lj-mini-badge");
       if (!badge) return;
-      const count = feedDoc.querySelectorAll('[data-lj-promoted="true"], [data-lj-suggested="true"], [data-lj-recommended="true"], [data-lj-non-connection="true"], [data-lj-poll="true"], [data-lj-keyword-filtered="true"], [data-lj-too-old="true"]').length;
+      const count = feedDoc.querySelectorAll('[data-lj-promoted="true"], [data-lj-suggested="true"], [data-lj-recommended="true"], [data-lj-non-connection="true"], [data-lj-poll="true"], [data-lj-celebration="true"], [data-lj-keyword-filtered="true"], [data-lj-too-old="true"]').length;
       badge.textContent = count > 0 ? "\u{1F50D} " + count + " filtered" : "\u{1F50D} Sift";
       const tip = feedDoc.getElementById("lj-badge-tip");
       if (tip && tip.classList.contains("visible")) updateBreakdown();
@@ -408,6 +427,7 @@
       feedDoc.body.classList.toggle("lj-hide-non-connections", settings.hideNonConnections);
       feedDoc.body.classList.toggle("lj-hide-sidebar", settings.hideSidebar);
       feedDoc.body.classList.toggle("lj-hide-polls", settings.hidePolls);
+      feedDoc.body.classList.toggle("lj-hide-celebrations", settings.hideCelebrations);
       feedDoc.body.classList.toggle("lj-hide-keyword-filtered", settings.feedKeywordFilterEnabled);
       feedDoc.body.classList.toggle("lj-hide-old-posts", settings.postAgeLimit > 0);
     }, hideSidebarElements = function() {
@@ -574,7 +594,7 @@
     let initialized = false;
     let feedDoc = document;
     const DEFAULTS = SIFT_DEFAULTS;
-    const SETTING_KEYS = /* @__PURE__ */ new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "feedKeywordFilterEnabled", "feedKeywords", "postAgeLimit", "hideProfileAnalytics"]);
+    const SETTING_KEYS = /* @__PURE__ */ new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywords", "postAgeLimit", "hideProfileAnalytics"]);
     let settings = { ...DEFAULTS };
     let nudgeTimer = null;
     const POST_TYPE_LABELS = /* @__PURE__ */ new Set([
@@ -585,6 +605,15 @@
       "Popular course on LinkedIn Learning"
     ]);
     const POLL_VOTE_RE = /^\d+ votes?$/;
+    const CELEBRATION_PATTERNS = [
+      "job update",
+      "started a new position",
+      "work anniversary",
+      "celebrating",
+      "new role",
+      "promoted to",
+      "birthday"
+    ];
     let pendingStats = {};
     let feedPaused = false;
     document.addEventListener("keydown", (e) => {

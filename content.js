@@ -8,6 +8,7 @@
     hideNonConnections: false,
     hideSidebar: true,
     hidePolls: false,
+    hideCelebrations: false,
     feedKeywordFilterEnabled: true,
     feedKeywords: [],
     postAgeLimit: 0,

@@ -36,3 +36,40 @@ describe("Poll detection regex", () => {
     expect(POLL_VOTE_RE.test("42 voters")).toBe(false);
   });
 });
+
+// Celebration detection patterns — same list used in src/feed.js
+const CELEBRATION_PATTERNS = [
+  "job update", "started a new position", "work anniversary",
+  "celebrating", "new role", "promoted to", "birthday",
+];
+
+function matchesCelebration(text) {
+  const lower = text.toLowerCase();
+  return CELEBRATION_PATTERNS.some((p) => lower.includes(p));
+}
+
+describe("Celebration detection", () => {
+  it("matches job update header", () => {
+    expect(matchesCelebration("Wyatt McRoberts' job update")).toBe(true);
+    expect(matchesCelebration("Joyce Wu's job update")).toBe(true);
+  });
+
+  it("matches new position text", () => {
+    expect(matchesCelebration("Wyatt started a new position as Data Engineer")).toBe(true);
+  });
+
+  it("matches work anniversary", () => {
+    expect(matchesCelebration("Celebrating 5 years at Google!")).toBe(true);
+    expect(matchesCelebration("John's work anniversary")).toBe(true);
+  });
+
+  it("matches birthday", () => {
+    expect(matchesCelebration("Wish Jane a happy birthday")).toBe(true);
+  });
+
+  it("does not match regular posts", () => {
+    expect(matchesCelebration("I just published an article about AI")).toBe(false);
+    expect(matchesCelebration("Looking for a senior engineer")).toBe(false);
+    expect(matchesCelebration("Great insights on product management")).toBe(false);
+  });
+});

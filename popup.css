@@ -138,6 +138,17 @@ body {
   color: #1F2328;
 }
 
+.age-select {
+  font-family: 'EB Garamond', Garamond, serif;
+  font-size: 12px;
+  padding: 2px 6px;
+  border: 1px solid #E4DDD2;
+  border-radius: 4px;
+  background: #FAF7F2;
+  color: #1F2328;
+  cursor: pointer;
+}
+
 .toggle-switch {
   position: relative;
   width: 36px;

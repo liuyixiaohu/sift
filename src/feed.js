@@ -1,5 +1,5 @@
 import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
-import { matchesFeedKeyword } from "./shared/matching.js";
+import { matchesFeedKeyword, parsePostAgeDays } from "./shared/matching.js";
 import { sendBadgeCount } from "./shared/badge.js";
 
 if (chrome.runtime?.id) {
@@ -55,7 +55,7 @@ if (chrome.runtime?.id) {
 
   // === Storage ===
   const DEFAULTS = SIFT_DEFAULTS;
-  const SETTING_KEYS = new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "feedKeywordFilterEnabled", "feedKeywords", "hideProfileAnalytics"]);
+  const SETTING_KEYS = new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "feedKeywordFilterEnabled", "feedKeywords", "postAgeLimit", "hideProfileAnalytics"]);
   let settings = { ...DEFAULTS };
 
   function loadSettings(cb) {
@@ -195,6 +195,19 @@ if (chrome.runtime?.id) {
           }
         }
       }
+
+      // Post age filter — parse visible time text (e.g. "2d", "1w")
+      if (settings.postAgeLimit > 0 && !article.dataset.ljAgeChecked) {
+        article.dataset.ljAgeChecked = "1";
+        const subDesc = article.querySelector(".update-components-actor__sub-description");
+        if (subDesc) {
+          const timeText = subDesc.textContent.trim().split(/[·•]/)[0].trim();
+          const ageDays = parsePostAgeDays(timeText);
+          if (ageDays >= settings.postAgeLimit) {
+            article.dataset.ljTooOld = "true";
+          }
+        }
+      }
     }
     flushStats();
   }
@@ -206,6 +219,16 @@ if (chrome.runtime?.id) {
     for (const article of main.querySelectorAll('[role="article"]')) {
       delete article.dataset.ljKeywordChecked;
       delete article.dataset.ljKeywordFiltered;
+    }
+  }
+
+  // Clear age marks on all articles (called when postAgeLimit changes)
+  function clearAgeMarks() {
+    const main = feedMain();
+    if (!main) return;
+    for (const article of main.querySelectorAll('[role="article"]')) {
+      delete article.dataset.ljAgeChecked;
+      delete article.dataset.ljTooOld;
     }
   }
 
@@ -283,7 +306,7 @@ if (chrome.runtime?.id) {
       feedDoc.body.classList.remove(
         "lj-hide-promoted", "lj-hide-suggested",
         "lj-hide-recommended", "lj-hide-non-connections", "lj-hide-sidebar",
-        "lj-hide-polls", "lj-hide-keyword-filtered"
+        "lj-hide-polls", "lj-hide-keyword-filtered", "lj-hide-old-posts"
       );
       showToast("Filters paused (Shift+J to resume)");
     } else {
@@ -369,6 +392,7 @@ if (chrome.runtime?.id) {
       Strangers: feedDoc.querySelectorAll('[data-lj-non-connection="true"]').length,
       Polls: feedDoc.querySelectorAll('[data-lj-poll="true"]').length,
       Keywords: feedDoc.querySelectorAll('[data-lj-keyword-filtered="true"]').length,
+      "Too Old": feedDoc.querySelectorAll('[data-lj-too-old="true"]').length,
     };
     const lines = Object.entries(counts).filter(([, v]) => v > 0).map(([k, v]) => v + " " + k);
     tip.textContent = lines.length > 0 ? lines.join("\n") : "Nothing filtered yet";
@@ -377,7 +401,7 @@ if (chrome.runtime?.id) {
   function updateBadgeCount() {
     const badge = feedDoc.getElementById("lj-mini-badge");
     if (!badge) return;
-    const count = feedDoc.querySelectorAll('[data-lj-promoted="true"], [data-lj-suggested="true"], [data-lj-recommended="true"], [data-lj-non-connection="true"], [data-lj-poll="true"], [data-lj-keyword-filtered="true"]').length;
+    const count = feedDoc.querySelectorAll('[data-lj-promoted="true"], [data-lj-suggested="true"], [data-lj-recommended="true"], [data-lj-non-connection="true"], [data-lj-poll="true"], [data-lj-keyword-filtered="true"], [data-lj-too-old="true"]').length;
     badge.textContent = count > 0 ? "\uD83D\uDD0D " + count + " filtered" : "\uD83D\uDD0D Sift";
     // Also update breakdown if visible
     const tip = feedDoc.getElementById("lj-badge-tip");
@@ -448,6 +472,7 @@ if (chrome.runtime?.id) {
     feedDoc.body.classList.toggle("lj-hide-sidebar", settings.hideSidebar);
     feedDoc.body.classList.toggle("lj-hide-polls", settings.hidePolls);
     feedDoc.body.classList.toggle("lj-hide-keyword-filtered", settings.feedKeywordFilterEnabled);
+    feedDoc.body.classList.toggle("lj-hide-old-posts", settings.postAgeLimit > 0);
   }
 
   // Only re-scan when actual settings change, not stats writes
@@ -457,6 +482,9 @@ if (chrome.runtime?.id) {
     // Keyword list changed — clear marks so posts get re-evaluated
     if ("feedKeywords" in changes || "feedKeywordFilterEnabled" in changes) {
       clearKeywordMarks();
+    }
+    if ("postAgeLimit" in changes) {
+      clearAgeMarks();
     }
     loadSettings((s) => {
       if (profileInitialized) applyProfileClasses();

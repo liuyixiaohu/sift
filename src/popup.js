@@ -236,6 +236,35 @@ import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
       chrome.storage.local.set({ hidePolls: v });
     }));
 
+    // Post age filter
+    let ageRow = document.createElement("div");
+    ageRow.className = "toggle-row";
+    let ageLabel = document.createElement("span");
+    ageLabel.className = "toggle-label";
+    ageLabel.textContent = "Hide Old Posts";
+    let ageSelect = document.createElement("select");
+    ageSelect.className = "age-select";
+    [
+      { value: 0, label: "Off" },
+      { value: 1, label: "> 1 day" },
+      { value: 3, label: "> 3 days" },
+      { value: 7, label: "> 1 week" },
+      { value: 14, label: "> 2 weeks" },
+      { value: 30, label: "> 1 month" },
+    ].forEach(function (opt) {
+      let option = document.createElement("option");
+      option.value = opt.value;
+      option.textContent = opt.label;
+      if (settings.postAgeLimit === opt.value) option.selected = true;
+      ageSelect.appendChild(option);
+    });
+    ageSelect.addEventListener("change", function () {
+      chrome.storage.local.set({ postAgeLimit: parseInt(ageSelect.value, 10) });
+    });
+    ageRow.appendChild(ageLabel);
+    ageRow.appendChild(ageSelect);
+    feedGroup.appendChild(ageRow);
+
     // Feed Keyword Filter
     feedGroup.appendChild(createToggle("Hide by Keywords", settings.feedKeywordFilterEnabled, function (v) {
       chrome.storage.local.set({ feedKeywordFilterEnabled: v });

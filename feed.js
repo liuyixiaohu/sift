@@ -10,6 +10,8 @@
     hidePolls: false,
     feedKeywordFilterEnabled: true,
     feedKeywords: [],
+    postAgeLimit: 0,
+    // 0 = off, days threshold: 1, 3, 7, 14, 30
     hasSeenOnboarding: false,
     // Profile page
     hideProfileAnalytics: true,
@@ -53,6 +55,30 @@
       if (kw && lower.includes(kw.toLowerCase())) return kw;
     }
     return null;
+  }
+  function parsePostAgeDays(timeText) {
+    const m = timeText.match(/^(\d+)\s*(m|h|d|w|mo|y|yr)$/);
+    if (!m) return 0;
+    const n = parseInt(m[1], 10);
+    switch (m[2]) {
+      case "m":
+        return 0;
+      // minutes
+      case "h":
+        return 0;
+      // hours (< 1 day)
+      case "d":
+        return n;
+      case "w":
+        return n * 7;
+      case "mo":
+        return n * 30;
+      case "y":
+      case "yr":
+        return n * 365;
+      default:
+        return 0;
+    }
   }
 
   // src/shared/badge.js
@@ -184,6 +210,17 @@
             }
           }
         }
+        if (settings.postAgeLimit > 0 && !article.dataset.ljAgeChecked) {
+          article.dataset.ljAgeChecked = "1";
+          const subDesc = article.querySelector(".update-components-actor__sub-description");
+          if (subDesc) {
+            const timeText = subDesc.textContent.trim().split(/[·•]/)[0].trim();
+            const ageDays = parsePostAgeDays(timeText);
+            if (ageDays >= settings.postAgeLimit) {
+              article.dataset.ljTooOld = "true";
+            }
+          }
+        }
       }
       flushStats();
     }, clearKeywordMarks = function() {
@@ -192,6 +229,13 @@
       for (const article of main.querySelectorAll('[role="article"]')) {
         delete article.dataset.ljKeywordChecked;
         delete article.dataset.ljKeywordFiltered;
+      }
+    }, clearAgeMarks = function() {
+      const main = feedMain();
+      if (!main) return;
+      for (const article of main.querySelectorAll('[role="article"]')) {
+        delete article.dataset.ljAgeChecked;
+        delete article.dataset.ljTooOld;
       }
     }, makeUnfollowBtn = function(article) {
       const btn = feedDoc.createElement("button");
@@ -255,7 +299,8 @@
           "lj-hide-non-connections",
           "lj-hide-sidebar",
           "lj-hide-polls",
-          "lj-hide-keyword-filtered"
+          "lj-hide-keyword-filtered",
+          "lj-hide-old-posts"
         );
         showToast("Filters paused (Shift+J to resume)");
       } else {
@@ -314,14 +359,15 @@
         Recommended: feedDoc.querySelectorAll('[data-lj-recommended="true"]').length,
         Strangers: feedDoc.querySelectorAll('[data-lj-non-connection="true"]').length,
         Polls: feedDoc.querySelectorAll('[data-lj-poll="true"]').length,
-        Keywords: feedDoc.querySelectorAll('[data-lj-keyword-filtered="true"]').length
+        Keywords: feedDoc.querySelectorAll('[data-lj-keyword-filtered="true"]').length,
+        "Too Old": feedDoc.querySelectorAll('[data-lj-too-old="true"]').length
       };
       const lines = Object.entries(counts).filter(([, v]) => v > 0).map(([k, v]) => v + " " + k);
       tip.textContent = lines.length > 0 ? lines.join("\n") : "Nothing filtered yet";
     }, updateBadgeCount = function() {
       const badge = feedDoc.getElementById("lj-mini-badge");
       if (!badge) return;
-      const count = feedDoc.querySelectorAll('[data-lj-promoted="true"], [data-lj-suggested="true"], [data-lj-recommended="true"], [data-lj-non-connection="true"], [data-lj-poll="true"], [data-lj-keyword-filtered="true"]').length;
+      const count = feedDoc.querySelectorAll('[data-lj-promoted="true"], [data-lj-suggested="true"], [data-lj-recommended="true"], [data-lj-non-connection="true"], [data-lj-poll="true"], [data-lj-keyword-filtered="true"], [data-lj-too-old="true"]').length;
       badge.textContent = count > 0 ? "\u{1F50D} " + count + " filtered" : "\u{1F50D} Sift";
       const tip = feedDoc.getElementById("lj-badge-tip");
       if (tip && tip.classList.contains("visible")) updateBreakdown();
@@ -367,6 +413,7 @@
       feedDoc.body.classList.toggle("lj-hide-sidebar", settings.hideSidebar);
       feedDoc.body.classList.toggle("lj-hide-polls", settings.hidePolls);
       feedDoc.body.classList.toggle("lj-hide-keyword-filtered", settings.feedKeywordFilterEnabled);
+      feedDoc.body.classList.toggle("lj-hide-old-posts", settings.postAgeLimit > 0);
     }, hideSidebarElements = function() {
       feedDoc.querySelectorAll(SIDEBAR_SELECTOR_ALL).forEach((node) => {
         node.style.display = "none";
@@ -531,7 +578,7 @@
     let initialized = false;
     let feedDoc = document;
     const DEFAULTS = SIFT_DEFAULTS;
-    const SETTING_KEYS = /* @__PURE__ */ new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "feedKeywordFilterEnabled", "feedKeywords", "hideProfileAnalytics"]);
+    const SETTING_KEYS = /* @__PURE__ */ new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "feedKeywordFilterEnabled", "feedKeywords", "postAgeLimit", "hideProfileAnalytics"]);
     let settings = { ...DEFAULTS };
     let nudgeTimer = null;
     const POST_TYPE_LABELS = /* @__PURE__ */ new Set([
@@ -560,6 +607,9 @@
       if (!Object.keys(changes).some((k) => SETTING_KEYS.has(k))) return;
       if ("feedKeywords" in changes || "feedKeywordFilterEnabled" in changes) {
         clearKeywordMarks();
+      }
+      if ("postAgeLimit" in changes) {
+        clearAgeMarks();
       }
       loadSettings((s) => {
         if (profileInitialized) applyProfileClasses();

@@ -10,6 +10,8 @@
     hidePolls: false,
     feedKeywordFilterEnabled: true,
     feedKeywords: [],
+    postAgeLimit: 0,
+    // 0 = off, days threshold: 1, 3, 7, 14, 30
     hasSeenOnboarding: false,
     // Profile page
     hideProfileAnalytics: true,

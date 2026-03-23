@@ -28,8 +28,16 @@ Clean up LinkedIn: filter feed by keywords, hide ads & spam, mute or unfollow in
 - **Dim / Hide filtered cards** toggle
 - Badge persistence across LinkedIn DOM re-renders
 
+### Profile (`/in/*`)
+- **Hide Sidebar** — removes right-side clutter (ads, "People you may know", "You might like")
+- **Hide Analytics** — hides the Analytics section (profile views, impressions, search appearances)
+
+### My Network (`/mynetwork/*`)
+- **Hide Ads** — removes Promoted ads from the sidebar
+- **Hide Game Promo** — removes "Need a 30 second break?" game promotions
+
 ### Popup
-- **Controls** — toggles grouped by page (Feed / Jobs), keyword list editing, skip-list editing with search
+- **Controls** — toggles grouped by page (Feed / Profile / Jobs), keyword list editing, skip-list editing with search
 - **Stats** — real-time counters (ads hidden, keywords hidden, jobs flagged, etc.) with Today + All Time
 - **Data** — export settings as JSON, import to restore, reset to defaults
 
@@ -39,7 +47,7 @@ Clean up LinkedIn: filter feed by keywords, hide ads & spam, mute or unfollow in
 2. Open `chrome://extensions/`
 3. Enable **Developer mode** (top right)
 4. Click **Load unpacked** and select the folder
-5. Visit LinkedIn — Sift activates automatically on feed and job search pages
+5. Visit LinkedIn — Sift activates automatically on feed, profile, network, and job search pages
 
 ## Development
 

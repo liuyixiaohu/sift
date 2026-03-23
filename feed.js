@@ -190,7 +190,7 @@
             article.dataset.ljSuggested = "true";
             if (settings.hideSuggested) incrementStat("suggestedHidden");
           }
-          if (labels.has("Recommended for you") || labels.has("Jobs recommended for you") || labels.has("Popular course on LinkedIn Learning")) {
+          if (labels.has("Recommended for you") || labels.has("Jobs recommended for you") || labels.has("Popular course on LinkedIn Learning") || labels.has("You\u2019re a top applicant for these jobs")) {
             article.dataset.ljRecommended = "true";
             if (settings.hideRecommended) incrementStat("recommendedHidden");
           }
@@ -602,7 +602,8 @@
       "Suggested",
       "Recommended for you",
       "Jobs recommended for you",
-      "Popular course on LinkedIn Learning"
+      "Popular course on LinkedIn Learning",
+      "You\u2019re a top applicant for these jobs"
     ]);
     const POLL_VOTE_RE = /^\d+ votes?$/;
     const CELEBRATION_PATTERNS = [

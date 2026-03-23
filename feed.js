@@ -82,11 +82,7 @@
   }
 
   // src/shared/badge.js
-  function sendBadgeCount(count) {
-    try {
-      chrome.runtime.sendMessage({ type: "updateBadge", count });
-    } catch (e) {
-    }
+  function sendBadgeCount() {
   }
 
   // src/feed.js

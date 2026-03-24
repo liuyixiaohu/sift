@@ -312,7 +312,7 @@ if (chrome.runtime?.id) {
       let placed = false;
       for (const el of article.querySelectorAll("p, div")) {
         if (el.children.length > 0) continue;
-        if (/^[•·]\s*(1st|2nd|3rd\+?|Follow)$/.test(el.textContent.trim())) {
+        if (/^[•·]\s*1st$/.test(el.textContent.trim())) {
           const nameContainer = el.parentElement;
           Object.assign(nameContainer.style, { display: "flex", alignItems: "center", gap: "6px" });
           nameContainer.appendChild(makeUnfollowBtn(article));

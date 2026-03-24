@@ -102,7 +102,7 @@
         if (iframe.offsetWidth < MIN_FEED_IFRAME_WIDTH) continue;
         try {
           const doc = iframe.contentDocument;
-          if (doc && doc.body) {
+          if (doc && doc.body && doc.querySelector("main")) {
             feedDoc = doc;
             return;
           }
@@ -142,15 +142,9 @@
           break;
         }
       }
-      const header = article.querySelector(".update-components-header");
-      const headerText = header ? header.textContent.toLowerCase() : "";
-      if (CELEBRATION_PATTERNS.some((p) => headerText.includes(p))) {
+      const fullText = article.textContent.toLowerCase();
+      if (CELEBRATION_PATTERNS.some((p) => fullText.includes(p))) {
         types.add("celebration");
-      } else {
-        const fullText = article.textContent.toLowerCase();
-        if (CELEBRATION_PATTERNS.some((p) => fullText.includes(p))) {
-          types.add("celebration");
-        }
       }
       return types;
     }, incrementStat = function(key) {
@@ -173,11 +167,18 @@
       });
     }, feedMain = function() {
       return feedDoc.querySelector('main[role="main"]') || feedDoc.querySelector("main");
+    }, feedPosts = function(container) {
+      const list = container.querySelector('[role="list"]');
+      if (list) {
+        const posts = list.querySelectorAll(":scope > [data-display-contents]");
+        if (posts.length) return posts;
+      }
+      return container.querySelectorAll('[role="article"]');
     }, scanPosts = function() {
       if (feedDoc !== document && !feedDoc.defaultView) updateFeedDoc();
       const main = feedMain();
       if (!main) return;
-      const articles = main.querySelectorAll('[role="article"]');
+      const articles = feedPosts(main);
       for (const article of articles) {
         if (!article.dataset.ljTypeChecked) {
           article.dataset.ljTypeChecked = "1";
@@ -195,8 +196,7 @@
             if (settings.hideRecommended) incrementStat("recommendedHidden");
           }
           const hasFollow = !!article.querySelector('button[aria-label*="Follow"]');
-          const hasHeader = !!article.querySelector(".update-components-header");
-          if (hasFollow && !hasHeader) {
+          if (hasFollow) {
             article.dataset.ljNonConnection = "true";
             if (settings.hideNonConnections) incrementStat("strangersHidden");
           }
@@ -239,14 +239,14 @@
     }, clearKeywordMarks = function() {
       const main = feedMain();
       if (!main) return;
-      for (const article of main.querySelectorAll('[role="article"]')) {
+      for (const article of feedPosts(main)) {
         delete article.dataset.ljKeywordChecked;
         delete article.dataset.ljKeywordFiltered;
       }
     }, clearAgeMarks = function() {
       const main = feedMain();
       if (!main) return;
-      for (const article of main.querySelectorAll('[role="article"]')) {
+      for (const article of feedPosts(main)) {
         delete article.dataset.ljAgeChecked;
         delete article.dataset.ljTooOld;
       }
@@ -287,19 +287,12 @@
     }, injectUnfollowButtons = function() {
       const main = feedMain();
       if (!main) return;
-      for (const article of main.querySelectorAll('[role="article"]')) {
+      for (const article of feedPosts(main)) {
         if (article.dataset.ljUnfollowAdded) continue;
         article.dataset.ljUnfollowAdded = "1";
-        const header = article.querySelector(".update-components-header");
-        if (header) {
-          const lastText = header.querySelector("span:last-of-type") || header.querySelector("a");
-          if (lastText) lastText.insertAdjacentElement("afterend", makeUnfollowBtn(article));
-        } else {
-          const actor = article.querySelector(".update-components-actor__title");
-          if (actor) {
-            Object.assign(actor.style, { display: "flex", alignItems: "center", gap: "6px" });
-            actor.appendChild(makeUnfollowBtn(article));
-          }
+        const menuBtn = article.querySelector('button[aria-label*="control menu"]');
+        if (menuBtn) {
+          menuBtn.insertAdjacentElement("beforebegin", makeUnfollowBtn(article));
         }
       }
     }, toggleFeedPause = function() {
@@ -522,10 +515,12 @@
     }, boot = function() {
       if (initialized || booting || !isFeedPage()) return;
       booting = true;
+      console.log("[Sift] v" + chrome.runtime.getManifest().version + " boot");
       loadSettings(() => {
         initialized = true;
         booting = false;
         reapply();
+        startPostScanRetry();
         startIframeCheck();
         if (!settings.hasSeenOnboarding) {
           setTimeout(() => {
@@ -534,6 +529,29 @@
           chrome.storage.local.set({ hasSeenOnboarding: true });
         }
       });
+    }, debouncedScan = function() {
+      scanPosts();
+      injectUnfollowButtons();
+      updateBadgeCount();
+    }, onScrollScan = function() {
+      clearTimeout(scrollScanTimer);
+      scrollScanTimer = setTimeout(debouncedScan, OBSERVER_DEBOUNCE_MS);
+    }, startPostScanRetry = function() {
+      if (postScanRetryInterval) clearInterval(postScanRetryInterval);
+      let retries = 0;
+      postScanRetryInterval = setInterval(() => {
+        const main = feedMain();
+        if (main && feedPosts(main).length > 0) {
+          debouncedScan();
+          clearInterval(postScanRetryInterval);
+          return;
+        }
+        if (++retries >= POST_SCAN_MAX_RETRIES) clearInterval(postScanRetryInterval);
+      }, POST_SCAN_RETRY_MS);
+      if (!scrollScanBound) {
+        scrollScanBound = true;
+        window.addEventListener("scroll", onScrollScan, { passive: true });
+      }
     }, startIframeCheck = function() {
       if (iframeCheckInterval) clearInterval(iframeCheckInterval);
       let ticks = 0;
@@ -658,6 +676,11 @@
     let feedObserver = null;
     let mainPollInterval = null;
     let booting = false;
+    const POST_SCAN_RETRY_MS = 500;
+    const POST_SCAN_MAX_RETRIES = 10;
+    let postScanRetryInterval = null;
+    let scrollScanBound = false;
+    let scrollScanTimer = null;
     let iframeCheckInterval = null;
     boot();
     if (isProfilePage()) bootProfile();

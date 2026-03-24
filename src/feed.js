@@ -47,7 +47,7 @@ if (chrome.runtime?.id) {
       if (iframe.offsetWidth < MIN_FEED_IFRAME_WIDTH) continue;
       try {
         const doc = iframe.contentDocument;
-        if (doc && doc.body) { feedDoc = doc; return; }
+        if (doc && doc.body && doc.querySelector("main")) { feedDoc = doc; return; }
       } catch (e) {}
     }
     feedDoc = document;
@@ -116,17 +116,10 @@ if (chrome.runtime?.id) {
         break;
       }
     }
-    // Celebration detection — check header first (fastest), then full text
-    const header = article.querySelector(".update-components-header");
-    const headerText = header ? header.textContent.toLowerCase() : "";
-    if (CELEBRATION_PATTERNS.some((p) => headerText.includes(p))) {
+    // Celebration detection — check full post text for known patterns
+    const fullText = article.textContent.toLowerCase();
+    if (CELEBRATION_PATTERNS.some((p) => fullText.includes(p))) {
       types.add("celebration");
-    } else {
-      // Fallback: check article text (for "started a new position" inside the card)
-      const fullText = article.textContent.toLowerCase();
-      if (CELEBRATION_PATTERNS.some((p) => fullText.includes(p))) {
-        types.add("celebration");
-      }
     }
     return types;
   }
@@ -160,13 +153,24 @@ if (chrome.runtime?.id) {
     return feedDoc.querySelector('main[role="main"]') || feedDoc.querySelector("main");
   }
 
+  // LinkedIn 2026 DOM: posts are div[data-display-contents] inside role="list".
+  // Falls back to legacy [role="article"] for older layouts.
+  function feedPosts(container) {
+    const list = container.querySelector('[role="list"]');
+    if (list) {
+      const posts = list.querySelectorAll(':scope > [data-display-contents]');
+      if (posts.length) return posts;
+    }
+    return container.querySelectorAll('[role="article"]');
+  }
+
   // Scan and tag all posts, then flush stats in a single storage write
   function scanPosts() {
     // Guard against stale feedDoc (iframe removed or replaced)
     if (feedDoc !== document && !feedDoc.defaultView) updateFeedDoc();
     const main = feedMain();
     if (!main) return;
-    const articles = main.querySelectorAll('[role="article"]');
+    const articles = feedPosts(main);
     for (const article of articles) {
       if (!article.dataset.ljTypeChecked) {
         article.dataset.ljTypeChecked = "1";
@@ -184,8 +188,7 @@ if (chrome.runtime?.id) {
           if (settings.hideRecommended) incrementStat("recommendedHidden");
         }
         const hasFollow = !!article.querySelector('button[aria-label*="Follow"]');
-        const hasHeader = !!article.querySelector(".update-components-header");
-        if (hasFollow && !hasHeader) {
+        if (hasFollow) {
           article.dataset.ljNonConnection = "true";
           if (settings.hideNonConnections) incrementStat("strangersHidden");
         }
@@ -238,7 +241,7 @@ if (chrome.runtime?.id) {
   function clearKeywordMarks() {
     const main = feedMain();
     if (!main) return;
-    for (const article of main.querySelectorAll('[role="article"]')) {
+    for (const article of feedPosts(main)) {
       delete article.dataset.ljKeywordChecked;
       delete article.dataset.ljKeywordFiltered;
     }
@@ -248,7 +251,7 @@ if (chrome.runtime?.id) {
   function clearAgeMarks() {
     const main = feedMain();
     if (!main) return;
-    for (const article of main.querySelectorAll('[role="article"]')) {
+    for (const article of feedPosts(main)) {
       delete article.dataset.ljAgeChecked;
       delete article.dataset.ljTooOld;
     }
@@ -298,23 +301,13 @@ if (chrome.runtime?.id) {
   function injectUnfollowButtons() {
     const main = feedMain();
     if (!main) return;
-    for (const article of main.querySelectorAll('[role="article"]')) {
+    for (const article of feedPosts(main)) {
       if (article.dataset.ljUnfollowAdded) continue;
       article.dataset.ljUnfollowAdded = "1";
-      const header = article.querySelector(".update-components-header");
-      if (header) {
-        // Interaction post ("X likes this") — the ... menu unfollows the
-        // interactor, so place the button right after the name link.
-        // Append after all text content (e.g. "Paras Dhillon reposted this [Unfollow]")
-        const lastText = header.querySelector("span:last-of-type") || header.querySelector("a");
-        if (lastText) lastText.insertAdjacentElement("afterend", makeUnfollowBtn(article));
-      } else {
-        // Direct post — the ... menu unfollows the author.
-        const actor = article.querySelector(".update-components-actor__title");
-        if (actor) {
-          Object.assign(actor.style, { display: "flex", alignItems: "center", gap: "6px" });
-          actor.appendChild(makeUnfollowBtn(article));
-        }
+      // Place unfollow button next to the "..." control menu button
+      const menuBtn = article.querySelector('button[aria-label*="control menu"]');
+      if (menuBtn) {
+        menuBtn.insertAdjacentElement("beforebegin", makeUnfollowBtn(article));
       }
     }
   }
@@ -652,11 +645,14 @@ if (chrome.runtime?.id) {
   function boot() {
     if (initialized || booting || !isFeedPage()) return;
     booting = true;
+    console.log("[Sift] v" + chrome.runtime.getManifest().version + " boot");
 
     loadSettings(() => {
       initialized = true;
       booting = false;
       reapply();
+      // Posts may not be rendered yet on initial load — retry scan
+      startPostScanRetry();
       // Iframe may not be ready yet on initial load — poll for it
       startIframeCheck();
       // One-time onboarding toast for new users
@@ -667,6 +663,47 @@ if (chrome.runtime?.id) {
         chrome.storage.local.set({ hasSeenOnboarding: true });
       }
     });
+  }
+
+  // === Continuous post scanning ===
+  // LinkedIn's new DOM doesn't reliably trigger MutationObserver on <main>.
+  // Use a combination of scroll-driven scanning and initial retry polling.
+  const POST_SCAN_RETRY_MS = 500;
+  const POST_SCAN_MAX_RETRIES = 10;
+  let postScanRetryInterval = null;
+  let scrollScanBound = false;
+
+  function debouncedScan() {
+    scanPosts();
+    injectUnfollowButtons();
+    updateBadgeCount();
+  }
+
+  let scrollScanTimer = null;
+  function onScrollScan() {
+    clearTimeout(scrollScanTimer);
+    scrollScanTimer = setTimeout(debouncedScan, OBSERVER_DEBOUNCE_MS);
+  }
+
+  function startPostScanRetry() {
+    // Initial retry: poll until posts appear
+    if (postScanRetryInterval) clearInterval(postScanRetryInterval);
+    let retries = 0;
+    postScanRetryInterval = setInterval(() => {
+      const main = feedMain();
+      if (main && feedPosts(main).length > 0) {
+        debouncedScan();
+        clearInterval(postScanRetryInterval);
+        return;
+      }
+      if (++retries >= POST_SCAN_MAX_RETRIES) clearInterval(postScanRetryInterval);
+    }, POST_SCAN_RETRY_MS);
+
+    // Scroll-driven: scan when user scrolls (catches infinite scroll loads)
+    if (!scrollScanBound) {
+      scrollScanBound = true;
+      window.addEventListener("scroll", onScrollScan, { passive: true });
+    }
   }
 
   // === Periodic iframe detection ===

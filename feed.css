@@ -8,6 +8,10 @@ body.lj-hide-sidebar footer[aria-label="LinkedIn Footer Content"],
 body.lj-hide-sidebar [role="contentinfo"][aria-label="LinkedIn Footer Content"] {
   display: none !important;
 }
+/* LinkedIn 2026 DOM: sidebar is the last column in the 3-column grid */
+body.lj-hide-sidebar main > div > div > div:last-child:nth-child(3) {
+  display: none !important;
+}
 
 /* Profile page: hide right sidebar (reuses hideSidebar toggle) */
 body.lj-hide-sidebar aside.scaffold-layout__aside {
@@ -29,7 +33,7 @@ body.lj-hide-network-game section:has(a[href*="/games/"]) {
   display: none !important;
 }
 
-/* Smooth collapse for filtered feed posts */
+/* Hide filtered feed posts — display:none overrides LinkedIn's display:contents */
 body.lj-hide-promoted [data-lj-promoted="true"],
 body.lj-hide-suggested [data-lj-suggested="true"],
 body.lj-hide-recommended [data-lj-recommended="true"],
@@ -38,18 +42,7 @@ body.lj-hide-polls [data-lj-poll="true"],
 body.lj-hide-celebrations [data-lj-celebration="true"],
 body.lj-hide-keyword-filtered [data-lj-keyword-filtered="true"],
 body.lj-hide-old-posts [data-lj-too-old="true"] {
-  max-height: 0 !important;
-  overflow: hidden !important;
-  opacity: 0 !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  border: none !important;
-  transition: max-height 0.3s ease-out,
-              opacity 0.2s ease-out,
-              padding 0.3s ease-out,
-              margin 0.3s ease-out !important;
+  display: none !important;
 }
 
 /* === Unfollow button on posts === */
@@ -73,7 +66,8 @@ body.lj-hide-old-posts [data-lj-too-old="true"] {
 }
 
 /* Show on hover over the post */
-[role="article"]:hover .lj-unfollow-btn {
+[role="article"]:hover .lj-unfollow-btn,
+[data-display-contents]:hover .lj-unfollow-btn {
   opacity: 0.7;
 }
 
@@ -186,6 +180,7 @@ body.lj-hide-old-posts [data-lj-too-old="true"] {
 @media (max-width: 1100px) {
   aside[aria-label="LinkedIn News"],
   [role="complementary"][aria-label="LinkedIn News"],
+  main > div > div > div:last-child:nth-child(3),
   footer[aria-label="LinkedIn Footer Content"],
   [role="contentinfo"][aria-label="LinkedIn Footer Content"] {
     display: none !important;

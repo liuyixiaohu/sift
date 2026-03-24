@@ -1,6 +1,6 @@
 {
   "name": "sift",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "private": true,
   "type": "module",
   "description": "Clean up LinkedIn: filter feed by keywords, hide ads & spam, mute or unfollow inline, and search your rules.",

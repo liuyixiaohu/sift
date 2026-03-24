@@ -313,8 +313,8 @@
           const nameLink = p.querySelector('a[href*="/in/"]');
           if (!nameLink) break;
           const btn = makeUnfollowBtn(article);
-          btn.style.marginLeft = "4px";
-          nameLink.after(btn);
+          btn.style.marginLeft = "6px";
+          p.appendChild(btn);
           break;
         }
       }

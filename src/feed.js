@@ -674,6 +674,7 @@ if (chrome.runtime?.id) {
   const POST_SCAN_MAX_RETRIES = 10;
   let postScanRetryInterval = null;
   let scrollScanBound = false;
+  let scrollTarget = null;
 
   function fullScan() {
     scanPosts();
@@ -702,9 +703,11 @@ if (chrome.runtime?.id) {
     }, POST_SCAN_RETRY_MS);
 
     // Scroll-driven: scan when user scrolls (catches infinite scroll loads)
+    // LinkedIn scrolls inside <main>, not window.
     if (!scrollScanBound) {
+      scrollTarget = feedMain() || window;
       scrollScanBound = true;
-      window.addEventListener("scroll", onScrollScan, { passive: true });
+      scrollTarget.addEventListener("scroll", onScrollScan, { passive: true });
     }
   }
 
@@ -762,9 +765,10 @@ if (chrome.runtime?.id) {
       if (mainPollInterval) clearInterval(mainPollInterval);
       if (postScanRetryInterval) clearInterval(postScanRetryInterval);
       if (feedObserver) feedObserver.disconnect();
-      if (scrollScanBound) {
-        window.removeEventListener("scroll", onScrollScan);
+      if (scrollScanBound && scrollTarget) {
+        scrollTarget.removeEventListener("scroll", onScrollScan);
         scrollScanBound = false;
+        scrollTarget = null;
       }
     }
   }

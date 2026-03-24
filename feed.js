@@ -551,8 +551,9 @@
         if (++retries >= POST_SCAN_MAX_RETRIES) clearInterval(postScanRetryInterval);
       }, POST_SCAN_RETRY_MS);
       if (!scrollScanBound) {
+        scrollTarget = feedMain() || window;
         scrollScanBound = true;
-        window.addEventListener("scroll", onScrollScan, { passive: true });
+        scrollTarget.addEventListener("scroll", onScrollScan, { passive: true });
       }
     }, startIframeCheck = function() {
       if (iframeCheckInterval) clearInterval(iframeCheckInterval);
@@ -596,9 +597,10 @@
         if (mainPollInterval) clearInterval(mainPollInterval);
         if (postScanRetryInterval) clearInterval(postScanRetryInterval);
         if (feedObserver) feedObserver.disconnect();
-        if (scrollScanBound) {
-          window.removeEventListener("scroll", onScrollScan);
+        if (scrollScanBound && scrollTarget) {
+          scrollTarget.removeEventListener("scroll", onScrollScan);
           scrollScanBound = false;
+          scrollTarget = null;
         }
       }
     };
@@ -687,6 +689,7 @@
     const POST_SCAN_MAX_RETRIES = 10;
     let postScanRetryInterval = null;
     let scrollScanBound = false;
+    let scrollTarget = null;
     let scrollScanTimer = null;
     let iframeCheckInterval = null;
     boot();

@@ -653,8 +653,8 @@ if (chrome.runtime?.id) {
       initialized = true;
       booting = false;
       reapply();
-      // Posts may not be rendered yet on initial load — retry scan
-      startPostScanRetry();
+      // Continuous scanning for initial load + infinite scroll
+      startContinuousScan();
       // Iframe may not be ready yet on initial load — poll for it
       startIframeCheck();
       // One-time onboarding toast for new users
@@ -668,13 +668,10 @@ if (chrome.runtime?.id) {
   }
 
   // === Continuous post scanning ===
-  // LinkedIn's new DOM doesn't reliably trigger MutationObserver on <main>.
-  // Use a combination of scroll-driven scanning and initial retry polling.
-  const POST_SCAN_RETRY_MS = 500;
-  const POST_SCAN_MAX_RETRIES = 10;
-  let postScanRetryInterval = null;
-  let scrollScanBound = false;
-  let scrollTarget = null;
+  // LinkedIn's 2026 DOM doesn't reliably trigger MutationObserver or scroll
+  // events. Use a simple interval that scans for new posts continuously.
+  const SCAN_INTERVAL_MS = 1500;
+  let scanInterval = null;
 
   function fullScan() {
     scanPosts();
@@ -682,33 +679,9 @@ if (chrome.runtime?.id) {
     updateBadgeCount();
   }
 
-  let scrollScanTimer = null;
-  function onScrollScan() {
-    clearTimeout(scrollScanTimer);
-    scrollScanTimer = setTimeout(fullScan, OBSERVER_DEBOUNCE_MS);
-  }
-
-  function startPostScanRetry() {
-    // Initial retry: poll until posts appear
-    if (postScanRetryInterval) clearInterval(postScanRetryInterval);
-    let retries = 0;
-    postScanRetryInterval = setInterval(() => {
-      const main = feedMain();
-      if (main && feedPosts(main).length > 0) {
-        fullScan();
-        clearInterval(postScanRetryInterval);
-        return;
-      }
-      if (++retries >= POST_SCAN_MAX_RETRIES) clearInterval(postScanRetryInterval);
-    }, POST_SCAN_RETRY_MS);
-
-    // Scroll-driven: scan when user scrolls (catches infinite scroll loads)
-    // LinkedIn scrolls inside <main>, not window.
-    if (!scrollScanBound) {
-      scrollTarget = feedMain() || window;
-      scrollScanBound = true;
-      scrollTarget.addEventListener("scroll", onScrollScan, { passive: true });
-    }
+  function startContinuousScan() {
+    if (scanInterval) clearInterval(scanInterval);
+    scanInterval = setInterval(fullScan, SCAN_INTERVAL_MS);
   }
 
   // === Periodic iframe detection ===
@@ -763,13 +736,8 @@ if (chrome.runtime?.id) {
       if (sidebarInterval) clearInterval(sidebarInterval);
       if (iframeCheckInterval) clearInterval(iframeCheckInterval);
       if (mainPollInterval) clearInterval(mainPollInterval);
-      if (postScanRetryInterval) clearInterval(postScanRetryInterval);
+      if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
       if (feedObserver) feedObserver.disconnect();
-      if (scrollScanBound && scrollTarget) {
-        scrollTarget.removeEventListener("scroll", onScrollScan);
-        scrollScanBound = false;
-        scrollTarget = null;
-      }
     }
   }
 

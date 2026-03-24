@@ -522,7 +522,7 @@
         initialized = true;
         booting = false;
         reapply();
-        startPostScanRetry();
+        startContinuousScan();
         startIframeCheck();
         if (!settings.hasSeenOnboarding) {
           setTimeout(() => {
@@ -535,26 +535,9 @@
       scanPosts();
       injectUnfollowButtons();
       updateBadgeCount();
-    }, onScrollScan = function() {
-      clearTimeout(scrollScanTimer);
-      scrollScanTimer = setTimeout(fullScan, OBSERVER_DEBOUNCE_MS);
-    }, startPostScanRetry = function() {
-      if (postScanRetryInterval) clearInterval(postScanRetryInterval);
-      let retries = 0;
-      postScanRetryInterval = setInterval(() => {
-        const main = feedMain();
-        if (main && feedPosts(main).length > 0) {
-          fullScan();
-          clearInterval(postScanRetryInterval);
-          return;
-        }
-        if (++retries >= POST_SCAN_MAX_RETRIES) clearInterval(postScanRetryInterval);
-      }, POST_SCAN_RETRY_MS);
-      if (!scrollScanBound) {
-        scrollTarget = feedMain() || window;
-        scrollScanBound = true;
-        scrollTarget.addEventListener("scroll", onScrollScan, { passive: true });
-      }
+    }, startContinuousScan = function() {
+      if (scanInterval) clearInterval(scanInterval);
+      scanInterval = setInterval(fullScan, SCAN_INTERVAL_MS);
     }, startIframeCheck = function() {
       if (iframeCheckInterval) clearInterval(iframeCheckInterval);
       let ticks = 0;
@@ -595,13 +578,11 @@
         if (sidebarInterval) clearInterval(sidebarInterval);
         if (iframeCheckInterval) clearInterval(iframeCheckInterval);
         if (mainPollInterval) clearInterval(mainPollInterval);
-        if (postScanRetryInterval) clearInterval(postScanRetryInterval);
-        if (feedObserver) feedObserver.disconnect();
-        if (scrollScanBound && scrollTarget) {
-          scrollTarget.removeEventListener("scroll", onScrollScan);
-          scrollScanBound = false;
-          scrollTarget = null;
+        if (scanInterval) {
+          clearInterval(scanInterval);
+          scanInterval = null;
         }
+        if (feedObserver) feedObserver.disconnect();
       }
     };
     "use strict";
@@ -685,12 +666,8 @@
     let feedObserver = null;
     let mainPollInterval = null;
     let booting = false;
-    const POST_SCAN_RETRY_MS = 500;
-    const POST_SCAN_MAX_RETRIES = 10;
-    let postScanRetryInterval = null;
-    let scrollScanBound = false;
-    let scrollTarget = null;
-    let scrollScanTimer = null;
+    const SCAN_INTERVAL_MS = 1500;
+    let scanInterval = null;
     let iframeCheckInterval = null;
     boot();
     if (isProfilePage()) bootProfile();

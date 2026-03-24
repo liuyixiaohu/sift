@@ -218,27 +218,23 @@ import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
     feedTitle.textContent = "Feed Page";
     feedGroup.appendChild(feedTitle);
 
-    feedGroup.appendChild(createToggle("Hide Ads", settings.hidePromoted, function (v) {
-      chrome.storage.local.set({ hidePromoted: v });
-    }));
-    feedGroup.appendChild(createToggle("Hide Suggested", settings.hideSuggested, function (v) {
-      chrome.storage.local.set({ hideSuggested: v });
-    }));
-    feedGroup.appendChild(createToggle("Hide Recommended", settings.hideRecommended, function (v) {
-      chrome.storage.local.set({ hideRecommended: v });
-    }));
-    feedGroup.appendChild(createToggle("Hide Strangers", settings.hideNonConnections, function (v) {
-      chrome.storage.local.set({ hideNonConnections: v });
-    }));
-    feedGroup.appendChild(createToggle("Hide Sidebar", settings.hideSidebar, function (v) {
-      chrome.storage.local.set({ hideSidebar: v });
-    }));
-    feedGroup.appendChild(createToggle("Hide Polls", settings.hidePolls, function (v) {
-      chrome.storage.local.set({ hidePolls: v });
-    }));
-    feedGroup.appendChild(createToggle("Hide Celebrations", settings.hideCelebrations, function (v) {
-      chrome.storage.local.set({ hideCelebrations: v });
-    }));
+    // Feed toggles — each maps a display label to a storage key
+    var feedToggles = [
+      ["Hide Ads", "hidePromoted"],
+      ["Hide Suggested", "hideSuggested"],
+      ["Hide Recommended", "hideRecommended"],
+      ["Hide Strangers", "hideNonConnections"],
+      ["Hide Sidebar", "hideSidebar"],
+      ["Hide Polls", "hidePolls"],
+      ["Hide Celebrations", "hideCelebrations"],
+    ];
+    feedToggles.forEach(function (pair) {
+      feedGroup.appendChild(createToggle(pair[0], settings[pair[1]], function (v) {
+        var obj = {};
+        obj[pair[1]] = v;
+        chrome.storage.local.set(obj);
+      }));
+    });
 
     // Post age filter
     let ageRow = document.createElement("div");
@@ -347,18 +343,19 @@ import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
     jobsTitle.textContent = "Jobs Page";
     jobsGroup.appendChild(jobsTitle);
 
-    jobsGroup.appendChild(createToggle("Detect No Sponsor", settings.sponsorCheckEnabled, function (v) {
-      chrome.storage.local.set({ sponsorCheckEnabled: v });
-    }));
-    jobsGroup.appendChild(createToggle("Detect Unpaid", settings.unpaidCheckEnabled, function (v) {
-      chrome.storage.local.set({ unpaidCheckEnabled: v });
-    }));
-    jobsGroup.appendChild(createToggle("Dim Filtered Cards", settings.dimFiltered, function (v) {
-      chrome.storage.local.set({ dimFiltered: v });
-    }));
-    jobsGroup.appendChild(createToggle("Hide Filtered Cards", settings.hideFiltered, function (v) {
-      chrome.storage.local.set({ hideFiltered: v });
-    }));
+    var jobsToggles = [
+      ["Detect No Sponsor", "sponsorCheckEnabled"],
+      ["Detect Unpaid", "unpaidCheckEnabled"],
+      ["Dim Filtered Cards", "dimFiltered"],
+      ["Hide Filtered Cards", "hideFiltered"],
+    ];
+    jobsToggles.forEach(function (pair) {
+      jobsGroup.appendChild(createToggle(pair[0], settings[pair[1]], function (v) {
+        var obj = {};
+        obj[pair[1]] = v;
+        chrome.storage.local.set(obj);
+      }));
+    });
 
     // Skipped Companies list
     let renderCompanies = createListSection(jobsGroup, "Skipped Companies", settings.skippedCompanies, function (company) {

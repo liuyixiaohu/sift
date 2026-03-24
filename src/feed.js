@@ -9,7 +9,6 @@ if (chrome.runtime?.id) {
 
   // === Tuning constants ===
   const MIN_FEED_IFRAME_WIDTH = 500;  // px — ignore narrow iframes (ads, widgets)
-  const OBSERVER_DEBOUNCE_MS = 300;   // debounce for MutationObserver callback
   const MAIN_POLL_INTERVAL_MS = 1500; // poll interval when waiting for <main>
   const MAIN_POLL_MAX_RETRIES = 20;   // max retries before giving up on <main>
   const IFRAME_POLL_INTERVAL_MS = 1000;
@@ -80,6 +79,13 @@ if (chrome.runtime?.id) {
   const POST_TYPE_LABELS = new Set([
     "Promoted", "Suggested", "Recommended for you",
     "Jobs recommended for you", "Popular course on LinkedIn Learning",
+    "You\u2019re a top applicant for these jobs",
+  ]);
+
+  // Subset of POST_TYPE_LABELS that map to the "recommended" category
+  const RECOMMENDED_LABELS = new Set([
+    "Recommended for you", "Jobs recommended for you",
+    "Popular course on LinkedIn Learning",
     "You\u2019re a top applicant for these jobs",
   ]);
 
@@ -183,7 +189,7 @@ if (chrome.runtime?.id) {
           article.dataset.ljSuggested = "true";
           if (settings.hideSuggested) incrementStat("suggestedHidden");
         }
-        if (labels.has("Recommended for you") || labels.has("Jobs recommended for you") || labels.has("Popular course on LinkedIn Learning") || labels.has("You\u2019re a top applicant for these jobs")) {
+        if ([...labels].some((l) => RECOMMENDED_LABELS.has(l))) {
           article.dataset.ljRecommended = "true";
           if (settings.hideRecommended) incrementStat("recommendedHidden");
         }
@@ -245,23 +251,12 @@ if (chrome.runtime?.id) {
     flushStats();
   }
 
-  // Clear keyword marks on all articles (called when keyword list changes)
-  function clearKeywordMarks() {
+  // Clear dataset marks on all articles so they get re-evaluated on next scan.
+  function clearPostMarks(...keys) {
     const main = feedMain();
     if (!main) return;
     for (const article of feedPosts(main)) {
-      delete article.dataset.ljKeywordChecked;
-      delete article.dataset.ljKeywordFiltered;
-    }
-  }
-
-  // Clear age marks on all articles (called when postAgeLimit changes)
-  function clearAgeMarks() {
-    const main = feedMain();
-    if (!main) return;
-    for (const article of feedPosts(main)) {
-      delete article.dataset.ljAgeChecked;
-      delete article.dataset.ljTooOld;
+      for (const key of keys) delete article.dataset[key];
     }
   }
 
@@ -524,10 +519,10 @@ if (chrome.runtime?.id) {
     if (!Object.keys(changes).some((k) => SETTING_KEYS.has(k))) return;
     // Keyword list changed — clear marks so posts get re-evaluated
     if ("feedKeywords" in changes || "feedKeywordFilterEnabled" in changes) {
-      clearKeywordMarks();
+      clearPostMarks("ljKeywordChecked", "ljKeywordFiltered");
     }
     if ("postAgeLimit" in changes) {
-      clearAgeMarks();
+      clearPostMarks("ljAgeChecked", "ljTooOld");
     }
     loadSettings((s) => {
       if (profileInitialized) applyProfileClasses();
@@ -603,44 +598,9 @@ if (chrome.runtime?.id) {
     }
   }
 
-  // === MutationObserver on <main> for infinite scroll ===
-  let feedObserver = null;
-  let mainPollInterval = null;
-
-  function setupObserver() {
-    if (feedObserver) feedObserver.disconnect();
-    if (mainPollInterval) clearInterval(mainPollInterval);
-
-    const mainEl = feedMain();
-    let debounceTimer = null;
-    feedObserver = new MutationObserver(() => {
-      clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => {
-        scanPosts();
-        injectUnfollowButtons();
-        updateBadgeCount();
-        nudgeScroll();
-      }, OBSERVER_DEBOUNCE_MS);
-    });
-
-    if (mainEl) {
-      feedObserver.observe(mainEl, { childList: true, subtree: true });
-    } else {
-      // Poll for <main> to appear — avoids body MutationObserver which
-      // freezes LinkedIn due to heavy DOM activity (see project memory).
-      let retries = 0;
-      mainPollInterval = setInterval(() => {
-        updateFeedDoc();
-        const m = feedMain();
-        if (m) {
-          clearInterval(mainPollInterval);
-          feedObserver.observe(m, { childList: true, subtree: true });
-          applyFeed();
-        }
-        if (++retries >= MAIN_POLL_MAX_RETRIES) clearInterval(mainPollInterval);
-      }, MAIN_POLL_INTERVAL_MS);
-    }
-  }
+  // MutationObserver was removed in v2.8 — it fires 0 mutations on LinkedIn's
+  // 2026 DOM. Continuous interval scanning (startContinuousScan) replaced it.
+  // See LEARNINGS §24 for rationale.
 
   // === Apply features that don't need <main> ===
   function applyShell() {
@@ -662,7 +622,6 @@ if (chrome.runtime?.id) {
   function reapply() {
     applyShell();
     applyFeed();
-    setupObserver();
   }
 
   // === Init ===
@@ -758,9 +717,7 @@ if (chrome.runtime?.id) {
       sendBadgeCount(0);
       if (sidebarInterval) clearInterval(sidebarInterval);
       if (iframeCheckInterval) clearInterval(iframeCheckInterval);
-      if (mainPollInterval) clearInterval(mainPollInterval);
       if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-      if (feedObserver) feedObserver.disconnect();
     }
   }
 

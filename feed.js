@@ -191,7 +191,7 @@
             article.dataset.ljSuggested = "true";
             if (settings.hideSuggested) incrementStat("suggestedHidden");
           }
-          if (labels.has("Recommended for you") || labels.has("Jobs recommended for you") || labels.has("Popular course on LinkedIn Learning") || labels.has("You\u2019re a top applicant for these jobs")) {
+          if ([...labels].some((l) => RECOMMENDED_LABELS.has(l))) {
             article.dataset.ljRecommended = "true";
             if (settings.hideRecommended) incrementStat("recommendedHidden");
           }
@@ -244,19 +244,11 @@
         }
       }
       flushStats();
-    }, clearKeywordMarks = function() {
+    }, clearPostMarks = function(...keys) {
       const main = feedMain();
       if (!main) return;
       for (const article of feedPosts(main)) {
-        delete article.dataset.ljKeywordChecked;
-        delete article.dataset.ljKeywordFiltered;
-      }
-    }, clearAgeMarks = function() {
-      const main = feedMain();
-      if (!main) return;
-      for (const article of feedPosts(main)) {
-        delete article.dataset.ljAgeChecked;
-        delete article.dataset.ljTooOld;
+        for (const key of keys) delete article.dataset[key];
       }
     }, makeUnfollowBtn = function(article) {
       const btn = feedDoc.createElement("button");
@@ -489,35 +481,6 @@
         } catch (e) {
         }
       }
-    }, setupObserver = function() {
-      if (feedObserver) feedObserver.disconnect();
-      if (mainPollInterval) clearInterval(mainPollInterval);
-      const mainEl = feedMain();
-      let debounceTimer = null;
-      feedObserver = new MutationObserver(() => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-          scanPosts();
-          injectUnfollowButtons();
-          updateBadgeCount();
-          nudgeScroll();
-        }, OBSERVER_DEBOUNCE_MS);
-      });
-      if (mainEl) {
-        feedObserver.observe(mainEl, { childList: true, subtree: true });
-      } else {
-        let retries = 0;
-        mainPollInterval = setInterval(() => {
-          updateFeedDoc();
-          const m = feedMain();
-          if (m) {
-            clearInterval(mainPollInterval);
-            feedObserver.observe(m, { childList: true, subtree: true });
-            applyFeed();
-          }
-          if (++retries >= MAIN_POLL_MAX_RETRIES) clearInterval(mainPollInterval);
-        }, MAIN_POLL_INTERVAL_MS);
-      }
     }, applyShell = function() {
       updateFeedDoc();
       injectFeedCssIntoIframe();
@@ -534,7 +497,6 @@
     }, reapply = function() {
       applyShell();
       applyFeed();
-      setupObserver();
     }, boot = function() {
       if (initialized || booting || !isFeedPage()) return;
       booting = true;
@@ -597,17 +559,14 @@
         sendBadgeCount(0);
         if (sidebarInterval) clearInterval(sidebarInterval);
         if (iframeCheckInterval) clearInterval(iframeCheckInterval);
-        if (mainPollInterval) clearInterval(mainPollInterval);
         if (scanInterval) {
           clearInterval(scanInterval);
           scanInterval = null;
         }
-        if (feedObserver) feedObserver.disconnect();
       }
     };
     "use strict";
     const MIN_FEED_IFRAME_WIDTH = 500;
-    const OBSERVER_DEBOUNCE_MS = 300;
     const MAIN_POLL_INTERVAL_MS = 1500;
     const MAIN_POLL_MAX_RETRIES = 20;
     const IFRAME_POLL_INTERVAL_MS = 1e3;
@@ -628,6 +587,12 @@
     const POST_TYPE_LABELS = /* @__PURE__ */ new Set([
       "Promoted",
       "Suggested",
+      "Recommended for you",
+      "Jobs recommended for you",
+      "Popular course on LinkedIn Learning",
+      "You\u2019re a top applicant for these jobs"
+    ]);
+    const RECOMMENDED_LABELS = /* @__PURE__ */ new Set([
       "Recommended for you",
       "Jobs recommended for you",
       "Popular course on LinkedIn Learning",
@@ -660,10 +625,10 @@
       if (area !== "local") return;
       if (!Object.keys(changes).some((k) => SETTING_KEYS.has(k))) return;
       if ("feedKeywords" in changes || "feedKeywordFilterEnabled" in changes) {
-        clearKeywordMarks();
+        clearPostMarks("ljKeywordChecked", "ljKeywordFiltered");
       }
       if ("postAgeLimit" in changes) {
-        clearAgeMarks();
+        clearPostMarks("ljAgeChecked", "ljTooOld");
       }
       loadSettings((s) => {
         if (profileInitialized) applyProfileClasses();
@@ -683,8 +648,6 @@
     ];
     const SIDEBAR_SELECTOR_ALL = SIDEBAR_SELECTORS.join(",");
     let sidebarInterval = null;
-    let feedObserver = null;
-    let mainPollInterval = null;
     let booting = false;
     const SCAN_INTERVAL_MS = 1500;
     let scanInterval = null;

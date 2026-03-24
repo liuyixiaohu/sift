@@ -293,12 +293,17 @@
       for (const article of feedPosts(main)) {
         if (article.dataset.ljUnfollowAdded) continue;
         article.dataset.ljUnfollowAdded = "1";
-        if (!article.textContent.includes("\u2022 1st") && !article.textContent.includes("\xB7 1st")) continue;
-        const avatar = article.querySelector('img[alt*="profile"]');
-        if (avatar) {
-          const avatarLink = avatar.closest("a") || avatar.parentElement;
-          avatarLink.insertAdjacentElement("afterend", makeUnfollowBtn(article));
+        let degreeEl = null;
+        for (const el of article.querySelectorAll("div")) {
+          const t = el.textContent.trim();
+          if ((t === "\u2022 1st" || t === "\xB7 1st") && el.children.length <= 1) {
+            degreeEl = el;
+            break;
+          }
         }
+        if (!degreeEl) continue;
+        Object.assign(degreeEl.style, { display: "inline-flex", alignItems: "center", gap: "6px" });
+        degreeEl.appendChild(makeUnfollowBtn(article));
       }
     }, toggleFeedPause = function() {
       feedPaused = !feedPaused;

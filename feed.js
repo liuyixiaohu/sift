@@ -294,8 +294,11 @@
         if (article.dataset.ljUnfollowAdded) continue;
         article.dataset.ljUnfollowAdded = "1";
         if (!article.textContent.includes("\u2022 1st") && !article.textContent.includes("\xB7 1st")) continue;
-        const menuBtn = article.querySelector('button[aria-label*="control menu"]');
-        if (menuBtn) menuBtn.insertAdjacentElement("beforebegin", makeUnfollowBtn(article));
+        const avatar = article.querySelector('img[alt*="profile"]');
+        if (avatar) {
+          const avatarLink = avatar.closest("a") || avatar.parentElement;
+          avatarLink.insertAdjacentElement("afterend", makeUnfollowBtn(article));
+        }
       }
     }, toggleFeedPause = function() {
       feedPaused = !feedPaused;

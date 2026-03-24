@@ -309,9 +309,12 @@ if (chrome.runtime?.id) {
       article.dataset.ljUnfollowAdded = "1";
       // Only show on 1st-degree connections
       if (!article.textContent.includes("\u2022 1st") && !article.textContent.includes("· 1st")) continue;
-      // Place next to the "..." control menu button
-      const menuBtn = article.querySelector('button[aria-label*="control menu"]');
-      if (menuBtn) menuBtn.insertAdjacentElement("beforebegin", makeUnfollowBtn(article));
+      // Place below the author avatar (left side, easy to reach)
+      const avatar = article.querySelector('img[alt*="profile"]');
+      if (avatar) {
+        const avatarLink = avatar.closest("a") || avatar.parentElement;
+        avatarLink.insertAdjacentElement("afterend", makeUnfollowBtn(article));
+      }
     }
   }
 

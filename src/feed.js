@@ -307,24 +307,11 @@ if (chrome.runtime?.id) {
     for (const article of feedPosts(main)) {
       if (article.dataset.ljUnfollowAdded) continue;
       article.dataset.ljUnfollowAdded = "1";
-      // Place unfollow button next to the author name.
-      // Find connection degree indicator ("• 1st", "• 2nd", etc.) — its parent is the name line.
-      let placed = false;
-      for (const el of article.querySelectorAll("p, div")) {
-        if (el.children.length > 0) continue;
-        if (/^[•·]\s*1st$/.test(el.textContent.trim())) {
-          const nameContainer = el.parentElement;
-          Object.assign(nameContainer.style, { display: "flex", alignItems: "center", gap: "6px" });
-          nameContainer.appendChild(makeUnfollowBtn(article));
-          placed = true;
-          break;
-        }
-      }
-      // Fallback: next to the control menu button
-      if (!placed) {
-        const menuBtn = article.querySelector('button[aria-label*="control menu"]');
-        if (menuBtn) menuBtn.insertAdjacentElement("beforebegin", makeUnfollowBtn(article));
-      }
+      // Only show on 1st-degree connections
+      if (!article.textContent.includes("\u2022 1st") && !article.textContent.includes("· 1st")) continue;
+      // Place next to the "..." control menu button
+      const menuBtn = article.querySelector('button[aria-label*="control menu"]');
+      if (menuBtn) menuBtn.insertAdjacentElement("beforebegin", makeUnfollowBtn(article));
     }
   }
 

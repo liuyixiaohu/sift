@@ -301,9 +301,22 @@
             break;
           }
         }
-        if (!degreeEl) continue;
-        Object.assign(degreeEl.style, { display: "inline-flex", alignItems: "center", gap: "6px" });
-        degreeEl.appendChild(makeUnfollowBtn(article));
+        if (degreeEl) {
+          Object.assign(degreeEl.style, { display: "inline-flex", alignItems: "center", gap: "6px" });
+          degreeEl.appendChild(makeUnfollowBtn(article));
+        }
+        const interactionRe = /\b(likes? this|loves? this|reposted|celebrates? this|commented on this|finds? this)\b/i;
+        for (const p of article.querySelectorAll("p")) {
+          const pt = p.textContent.trim();
+          if (pt.length > 80 || !interactionRe.test(pt)) continue;
+          if (p.querySelector(".lj-unfollow-btn")) break;
+          const nameLink = p.querySelector('a[href*="/in/"]');
+          if (!nameLink) break;
+          const btn = makeUnfollowBtn(article);
+          btn.style.marginLeft = "4px";
+          nameLink.after(btn);
+          break;
+        }
       }
     }, toggleFeedPause = function() {
       feedPaused = !feedPaused;

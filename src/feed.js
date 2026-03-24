@@ -307,7 +307,8 @@ if (chrome.runtime?.id) {
     for (const article of feedPosts(main)) {
       if (article.dataset.ljUnfollowAdded) continue;
       article.dataset.ljUnfollowAdded = "1";
-      // Only show on 1st-degree connections — place right after "• 1st"
+
+      // 1) Author-level: place right after "• 1st"
       let degreeEl = null;
       for (const el of article.querySelectorAll("div")) {
         const t = el.textContent.trim();
@@ -316,9 +317,24 @@ if (chrome.runtime?.id) {
           break;
         }
       }
-      if (!degreeEl) continue;
-      Object.assign(degreeEl.style, { display: "inline-flex", alignItems: "center", gap: "6px" });
-      degreeEl.appendChild(makeUnfollowBtn(article));
+      if (degreeEl) {
+        Object.assign(degreeEl.style, { display: "inline-flex", alignItems: "center", gap: "6px" });
+        degreeEl.appendChild(makeUnfollowBtn(article));
+      }
+
+      // 2) Interaction header: "XXX likes this" / "XXX loves this" / "XXX reposted"
+      const interactionRe = /\b(likes? this|loves? this|reposted|celebrates? this|commented on this|finds? this)\b/i;
+      for (const p of article.querySelectorAll("p")) {
+        const pt = p.textContent.trim();
+        if (pt.length > 80 || !interactionRe.test(pt)) continue;
+        if (p.querySelector(".lj-unfollow-btn")) break;
+        const nameLink = p.querySelector('a[href*="/in/"]');
+        if (!nameLink) break;
+        const btn = makeUnfollowBtn(article);
+        btn.style.marginLeft = "6px";
+        p.appendChild(btn);
+        break;
+      }
     }
   }
 

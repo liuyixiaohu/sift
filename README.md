@@ -59,7 +59,7 @@ Clean up LinkedIn: filter feed by keywords, hide ads & spam, mute or unfollow in
 npm install          # install esbuild + vitest
 npm run build        # bundle src/ → root JS files (IIFE)
 npm run watch        # rebuild on file changes
-npm test             # run 23 unit tests
+npm test             # run 42 unit tests
 ```
 
 Source lives in `src/`, shared modules in `src/shared/`. esbuild bundles each entry point into a self-contained IIFE at the project root for Chrome to load.

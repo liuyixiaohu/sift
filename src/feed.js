@@ -188,7 +188,11 @@ if (chrome.runtime?.id) {
           if (settings.hideRecommended) incrementStat("recommendedHidden");
         }
         const hasFollow = !!article.querySelector('button[aria-label*="Follow"]');
-        if (hasFollow) {
+        // Interaction posts ("X likes this", "X reposted this") appear through
+        // network activity — don't treat them as strangers even if author has Follow btn.
+        const postText = article.textContent.slice(0, 200).toLowerCase();
+        const isInteraction = /likes? this|loves? this|reposted this|commented on|celebrates this|finds? this/.test(postText);
+        if (hasFollow && !isInteraction) {
           article.dataset.ljNonConnection = "true";
           if (settings.hideNonConnections) incrementStat("strangersHidden");
         }
@@ -224,9 +228,13 @@ if (chrome.runtime?.id) {
       // Post age filter — parse visible time text (e.g. "2d", "1w")
       if (settings.postAgeLimit > 0 && !article.dataset.ljAgeChecked) {
         article.dataset.ljAgeChecked = "1";
-        const subDesc = article.querySelector(".update-components-actor__sub-description");
-        if (subDesc) {
-          const timeText = subDesc.textContent.trim().split(/[·•]/)[0].trim();
+        // Find time text: a short element containing "Xd •", "Xw •", etc.
+        let timeText = "";
+        for (const el of article.querySelectorAll("p, span")) {
+          const t = el.textContent.trim();
+          if (/^\d+[hdwmy]\b/.test(t)) { timeText = t.split(/[·•]/)[0].trim(); break; }
+        }
+        if (timeText) {
           const ageDays = parsePostAgeDays(timeText);
           if (ageDays >= settings.postAgeLimit) {
             article.dataset.ljTooOld = "true";
@@ -287,12 +295,7 @@ if (chrome.runtime?.id) {
       if (article.textContent.includes("You unfollowed")) {
         clearInterval(interval);
         setTimeout(() => {
-          article.style.maxHeight = "0";
-          article.style.overflow = "hidden";
-          article.style.opacity = "0";
-          article.style.padding = "0";
-          article.style.margin = "0";
-          article.style.transition = "max-height 0.3s, opacity 0.2s, padding 0.3s, margin 0.3s";
+          article.style.display = "none";
         }, UNFOLLOW_COLLAPSE_DELAY_MS);
       }
     }, UNFOLLOW_CHECK_INTERVAL_MS);
@@ -645,7 +648,6 @@ if (chrome.runtime?.id) {
   function boot() {
     if (initialized || booting || !isFeedPage()) return;
     booting = true;
-    console.log("[Sift] v" + chrome.runtime.getManifest().version + " boot");
 
     loadSettings(() => {
       initialized = true;
@@ -673,7 +675,7 @@ if (chrome.runtime?.id) {
   let postScanRetryInterval = null;
   let scrollScanBound = false;
 
-  function debouncedScan() {
+  function fullScan() {
     scanPosts();
     injectUnfollowButtons();
     updateBadgeCount();
@@ -682,7 +684,7 @@ if (chrome.runtime?.id) {
   let scrollScanTimer = null;
   function onScrollScan() {
     clearTimeout(scrollScanTimer);
-    scrollScanTimer = setTimeout(debouncedScan, OBSERVER_DEBOUNCE_MS);
+    scrollScanTimer = setTimeout(fullScan, OBSERVER_DEBOUNCE_MS);
   }
 
   function startPostScanRetry() {
@@ -692,7 +694,7 @@ if (chrome.runtime?.id) {
     postScanRetryInterval = setInterval(() => {
       const main = feedMain();
       if (main && feedPosts(main).length > 0) {
-        debouncedScan();
+        fullScan();
         clearInterval(postScanRetryInterval);
         return;
       }
@@ -758,7 +760,12 @@ if (chrome.runtime?.id) {
       if (sidebarInterval) clearInterval(sidebarInterval);
       if (iframeCheckInterval) clearInterval(iframeCheckInterval);
       if (mainPollInterval) clearInterval(mainPollInterval);
+      if (postScanRetryInterval) clearInterval(postScanRetryInterval);
       if (feedObserver) feedObserver.disconnect();
+      if (scrollScanBound) {
+        window.removeEventListener("scroll", onScrollScan);
+        scrollScanBound = false;
+      }
     }
   }
 

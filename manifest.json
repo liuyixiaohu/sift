@@ -3,7 +3,7 @@
   "name": "Sift",
   "version": "2.8",
   "description": "Clean up LinkedIn: filter feed by keywords, hide ads & spam, mute or unfollow inline, and search your rules.",
-  "permissions": ["storage"],
+  "permissions": ["storage", "contextMenus"],
   "background": {
     "service_worker": "background.js"
   },

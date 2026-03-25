@@ -17,7 +17,8 @@ Clean up LinkedIn: filter feed by keywords, hide ads & spam, mute or unfollow in
 - **Hide Old Posts** — hide posts older than 1 day / 3 days / 1 week / 2 weeks / 1 month
 - **Hide Sidebar** (LinkedIn News + footer)
 - **Hide Upsells** — removes "Try Campaign Manager" and similar promotions
-- **Unfollow** — inline button on each post, opens LinkedIn's menu to unfollow the author
+- **Unfollow** — inline button next to "· 1st" on posts and interaction headers ("XXX likes this")
+- **Mute Keyword** — right-click any text on LinkedIn → "Mute keyword" to add it to your filter
 - **Keyboard shortcut** — Shift+J to pause/resume all feed filters
 - **Icon Badge** — extension icon shows the filtered count at a glance
 

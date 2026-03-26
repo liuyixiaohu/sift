@@ -780,6 +780,7 @@
         labeledJobs.clear();
         scanAbort = false;
         lastDetailText = "";
+        updateScanButton();
         setTimeout(() => {
           if (!document.getElementById("lj-filter-panel")) init();
           else filterJobCards();

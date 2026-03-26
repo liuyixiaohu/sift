@@ -1118,6 +1118,7 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
       labeledJobs.clear();
       scanAbort = false;
       lastDetailText = "";
+      updateScanButton(); // reset button to default state
       setTimeout(() => {
         if (!document.getElementById("lj-filter-panel")) init();
         else filterJobCards();

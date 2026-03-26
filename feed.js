@@ -354,6 +354,13 @@
       toast.classList.add("visible");
       toastTimer = setTimeout(() => toast.classList.remove("visible"), onUndo ? 5e3 : 1800);
     }, createMiniBadge = function() {
+      if (!isFeedPage()) {
+        const existing = feedDoc.getElementById("lj-mini-badge");
+        if (existing) existing.remove();
+        const tip2 = feedDoc.getElementById("lj-badge-tip");
+        if (tip2) tip2.remove();
+        return;
+      }
       if (feedDoc.getElementById("lj-mini-badge")) return;
       const badge = feedDoc.createElement("div");
       badge.id = "lj-mini-badge";

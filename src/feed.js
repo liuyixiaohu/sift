@@ -392,6 +392,13 @@ if (chrome.runtime?.id) {
 
   // === Mini status badge (clickable with breakdown) ===
   function createMiniBadge() {
+    if (!isFeedPage()) {
+      const existing = feedDoc.getElementById("lj-mini-badge");
+      if (existing) existing.remove();
+      const tip = feedDoc.getElementById("lj-badge-tip");
+      if (tip) tip.remove();
+      return;
+    }
     if (feedDoc.getElementById("lj-mini-badge")) return;
     const badge = feedDoc.createElement("div");
     badge.id = "lj-mini-badge";

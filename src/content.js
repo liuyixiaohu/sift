@@ -32,11 +32,23 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
   const BADGE_DISPLAY = {
     reposted: "Reposted", applied: "Applied", noSponsor: "No Sponsor",
     skippedCompany: "Skipped Co.", skippedTitle: "Skipped Title",
-    unpaid: "Unpaid",
+    unpaid: "Unpaid", goodMatch: "Good Match",
   };
-  const BADGE_COLOR = "#D9797B";
-  // Border color priority (first matching reason determines border color)
-  const BORDER_PRIORITY = ["noSponsor", "reposted", "skippedCompany", "skippedTitle", "applied", "unpaid"];
+  // Per-reason colors. Negative signals share the brand rose; positive signals (goodMatch) use brand green.
+  const BADGE_RED = "#D9797B";
+  const BADGE_GREEN = "#5a8a6e";
+  const BADGE_COLORS = {
+    reposted: BADGE_RED, applied: BADGE_RED, noSponsor: BADGE_RED,
+    skippedCompany: BADGE_RED, skippedTitle: BADGE_RED, unpaid: BADGE_RED,
+    goodMatch: BADGE_GREEN,
+  };
+  // Hover tooltip text per reason. Empty string = no tooltip.
+  const BADGE_TOOLTIP = {
+    goodMatch: "Job match is high, review match details",
+  };
+  // Border color priority (first matching reason determines border color).
+  // goodMatch is at the end so any negative signal still owns the border color.
+  const BORDER_PRIORITY = ["noSponsor", "reposted", "skippedCompany", "skippedTitle", "applied", "unpaid", "goodMatch"];
 
   function getBorderReason(reasons) {
     for (const r of BORDER_PRIORITY) {
@@ -49,6 +61,7 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
   let skippedTitleKeywords = [];
   let sponsorCheckEnabled = true;
   let unpaidCheckEnabled = true;
+  let autoSkipDetected = false;
   let processedCards = new WeakSet();
   let lastDetailText = "";
 
@@ -83,6 +96,7 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
       skippedTitleKeywords: _defaults.skippedTitleKeywords || [],
       sponsorCheckEnabled: _defaults.sponsorCheckEnabled ?? true,
       unpaidCheckEnabled: _defaults.unpaidCheckEnabled ?? true,
+      autoSkipDetected: _defaults.autoSkipDetected ?? false,
       hasSeenIntro: false,
       panelPosition: null,
       dimFiltered: _defaults.dimFiltered ?? false,
@@ -92,6 +106,7 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
     skippedTitleKeywords = data.skippedTitleKeywords;
     sponsorCheckEnabled = data.sponsorCheckEnabled;
     unpaidCheckEnabled = data.unpaidCheckEnabled;
+    autoSkipDetected = data.autoSkipDetected;
     hasSeenIntro = data.hasSeenIntro;
     panelPosition = data.panelPosition;
     cardsDimmed = data.dimFiltered;
@@ -350,6 +365,12 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
   function detailHasNoSponsorship() { return NO_SPONSOR_RE.test(getDetailText()); }
   function detailHasUnpaid() { return UNPAID_RE.test(getDetailText()); }
 
+  // Returns true when LinkedIn signals this job is a strong match for the user.
+  // TODO(user): fill in the detection logic. See request below the file edit for guidance.
+  function detailHasGoodMatch() {
+    return false;
+  }
+
   // ==================== Get Detail Panel Text Fingerprint ====================
   function getDetailFingerprint() {
     const titleLink = document.querySelector('a[href*="/jobs/view/"]');
@@ -414,16 +435,20 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
 
     clearBadges(card);
 
+    // Border color follows the highest-priority reason (negative signals win over goodMatch)
+    const borderReason = getBorderReason(reasons);
+    const borderColor = BADGE_COLORS[borderReason] || BADGE_RED;
+
     // Set border on the first visible element (top of card)
     target.style.position = "relative";
     target.style.overflow = "visible";
-    target.style.borderLeft = "3px solid " + (BADGE_COLOR);
+    target.style.borderLeft = "3px solid " + borderColor;
 
     // If badge target differs from border target, also set position on it
     if (badgeTarget !== target) {
       badgeTarget.style.position = "relative";
       badgeTarget.style.overflow = "visible";
-      badgeTarget.style.borderLeft = "3px solid " + (BADGE_COLOR);
+      badgeTarget.style.borderLeft = "3px solid " + borderColor;
     }
 
     const container = document.createElement("div");
@@ -434,7 +459,9 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
       const badge = document.createElement("span");
       badge.className = "lj-badge";
       badge.textContent = BADGE_DISPLAY[reason] || reason;
-      badge.style.background = BADGE_COLOR;
+      badge.style.background = BADGE_COLORS[reason] || BADGE_RED;
+      const tip = BADGE_TOOLTIP[reason];
+      if (tip) badge.title = tip;
       container.appendChild(badge);
     });
 
@@ -545,6 +572,19 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
     sendBadgeCount(flagged);
   }
 
+  // Auto-add a company to the skippedCompanies list. De-dupes case-insensitively
+  // and triggers a re-filter so other cards from the same company also get badged.
+  function autoSkipCompany(card, triggerReason) {
+    const name = getCompanyName(card);
+    if (!name) return;
+    if (skippedCompanies.some((c) => c.toLowerCase() === name.toLowerCase())) return;
+    skippedCompanies.push(name);
+    saveValue("skippedCompanies", skippedCompanies);
+    renderLists();
+    refilterAll();
+    showToast("Auto-skipped: " + name + " (" + (BADGE_DISPLAY[triggerReason] || triggerReason) + ")");
+  }
+
   // ==================== Check Detail Panel Content, Label Specified Card ====================
   // Scan path passes card reference directly (100% accurate); passive detection uses getActiveCard()
   function checkDetailForCard(card) {
@@ -554,9 +594,14 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
     }
     if (sponsorCheckEnabled && detailHasNoSponsorship()) {
       labeled = labelCard(card, "noSponsor") || labeled;
+      if (autoSkipDetected) autoSkipCompany(card, "noSponsor");
     }
     if (unpaidCheckEnabled && detailHasUnpaid()) {
       labeled = labelCard(card, "unpaid") || labeled;
+      if (autoSkipDetected) autoSkipCompany(card, "unpaid");
+    }
+    if (detailHasGoodMatch()) {
+      labeled = labelCard(card, "goodMatch") || labeled;
     }
     return labeled;
   }
@@ -680,8 +725,9 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
       ".lj-card-dimmed{opacity:0.35 !important;transition:opacity 0.2s}",
       ".lj-card-hidden{display:none !important}",
       ".lj-card-dimmed:hover{opacity:0.7 !important}",
-      // Card border (brand rose)
-      "[data-lj-filtered]{border-left:3px solid #D9797B !important;position:relative !important;overflow:visible !important}",
+      // Card flagged: ensure positioning context for the badge container.
+      // Border color is set inline per-reason in applyBadges (red for negative, green for goodMatch).
+      "[data-lj-filtered]{position:relative !important;overflow:visible !important}",
       // Badge container
       ".lj-badges{position:absolute !important;left:0 !important;bottom:4px !important;z-index:10 !important;display:flex !important;flex-direction:column !important;gap:2px !important;pointer-events:none !important}",
       ".lj-badge{font-size:9px !important;font-weight:700 !important;padding:1px 6px !important;border-radius:8px !important;color:#fff !important;white-space:nowrap !important;line-height:1.4 !important;letter-spacing:0.3px !important}",
@@ -1090,20 +1136,6 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
     window.addEventListener("load", () => setTimeout(init, 1500));
   }
 
-  // ==================== Keyboard Shortcut (Ctrl/Cmd + Shift + S) ====================
-  // Changed from J to S to avoid conflict with Chrome DevTools (Ctrl+Shift+J)
-  document.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "S" || e.key === "s")) {
-      e.preventDefault();
-      const panel = document.getElementById("lj-filter-panel");
-      if (panel) {
-        panel.classList.toggle("collapsed");
-        const togBtn = panel.querySelector(".lj-toggle");
-        if (togBtn) togBtn.textContent = panel.classList.contains("collapsed") ? "+" : "\u2212";
-      }
-    }
-  });
-
   // ==================== SPA Route Detection (lightweight, no MutationObserver on body) ====================
   let lastUrl = location.href;
 
@@ -1219,19 +1251,22 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
     if (area !== "local") return;
     // Only react to actual setting keys, never to stats writes
     const settingKeys = ["skippedCompanies", "skippedTitleKeywords",
-      "sponsorCheckEnabled", "unpaidCheckEnabled", "dimFiltered", "hideFiltered"];
+      "sponsorCheckEnabled", "unpaidCheckEnabled", "autoSkipDetected",
+      "dimFiltered", "hideFiltered"];
     const hasSettingChange = settingKeys.some(k => k in changes);
     if (!hasSettingChange) return;
 
     chrome.storage.local.get({
       skippedCompanies: [], skippedTitleKeywords: [],
       sponsorCheckEnabled: true, unpaidCheckEnabled: true,
+      autoSkipDetected: false,
       dimFiltered: false, hideFiltered: false,
     }, (data) => {
       skippedCompanies = data.skippedCompanies;
       skippedTitleKeywords = data.skippedTitleKeywords;
       sponsorCheckEnabled = data.sponsorCheckEnabled;
       unpaidCheckEnabled = data.unpaidCheckEnabled;
+      autoSkipDetected = data.autoSkipDetected;
       cardsDimmed = data.dimFiltered;
       cardsHidden = data.hideFiltered;
       renderLists();

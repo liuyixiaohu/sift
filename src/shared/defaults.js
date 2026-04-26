@@ -18,6 +18,7 @@ export const SIFT_DEFAULTS = {
   // Jobs page
   sponsorCheckEnabled: true,
   unpaidCheckEnabled: true,
+  autoSkipDetected: false,
   dimFiltered: false,
   hideFiltered: false,
   skippedCompanies: [],

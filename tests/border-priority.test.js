@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 // getBorderReason is defined inside content.js IIFE, so we extract the logic here.
-const BORDER_PRIORITY = ["noSponsor", "reposted", "skippedCompany", "skippedTitle", "applied", "unpaid"];
+const BORDER_PRIORITY = ["noSponsor", "reposted", "skippedCompany", "skippedTitle", "applied", "unpaid", "goodMatch"];
 
 function getBorderReason(reasons) {
   for (const r of BORDER_PRIORITY) {
@@ -28,5 +28,11 @@ describe("getBorderReason", () => {
 
   it("falls back to first element for unknown reasons", () => {
     expect(getBorderReason(["unknown"])).toBe("unknown");
+  });
+
+  it("treats goodMatch as the lowest priority so any negative signal owns the border", () => {
+    expect(getBorderReason(["goodMatch", "noSponsor"])).toBe("noSponsor");
+    expect(getBorderReason(["goodMatch", "applied"])).toBe("applied");
+    expect(getBorderReason(["goodMatch"])).toBe("goodMatch");
   });
 });

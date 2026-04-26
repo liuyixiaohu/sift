@@ -333,35 +333,6 @@ if (chrome.runtime?.id) {
     }
   }
 
-  // === Keyboard shortcut: Shift+J to pause/resume feed filters ===
-  let feedPaused = false;
-
-  function toggleFeedPause() {
-    feedPaused = !feedPaused;
-    if (feedPaused) {
-      feedDoc.body.classList.remove(
-        "lj-hide-promoted", "lj-hide-suggested",
-        "lj-hide-recommended", "lj-hide-non-connections", "lj-hide-sidebar",
-        "lj-hide-polls", "lj-hide-celebrations", "lj-hide-keyword-filtered", "lj-hide-old-posts"
-      );
-      showToast("Filters paused (Shift+J to resume)");
-    } else {
-      applyBodyClasses();
-      scanPosts();
-      showToast("Filters resumed");
-    }
-  }
-
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "J" && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      // Don't trigger when typing in inputs
-      const tag = (e.target.tagName || "").toLowerCase();
-      if (tag === "input" || tag === "textarea" || e.target.isContentEditable) return;
-      e.preventDefault();
-      toggleFeedPause();
-    }
-  });
-
   // === Toast notification (with optional undo action) ===
   let toastTimer = null;
 

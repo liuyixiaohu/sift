@@ -346,6 +346,7 @@ import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
     var jobsToggles = [
       ["Detect No Sponsor", "sponsorCheckEnabled"],
       ["Detect Unpaid", "unpaidCheckEnabled"],
+      ["Auto-skip Flagged Companies", "autoSkipDetected"],
       ["Dim Filtered Cards", "dimFiltered"],
       ["Hide Filtered Cards", "hideFiltered"],
     ];

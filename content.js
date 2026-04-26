@@ -19,6 +19,7 @@
     // Jobs page
     sponsorCheckEnabled: true,
     unpaidCheckEnabled: true,
+    autoSkipDetected: false,
     dimFiltered: false,
     hideFiltered: false,
     skippedCompanies: [],
@@ -214,6 +215,8 @@
       return NO_SPONSOR_RE.test(getDetailText());
     }, detailHasUnpaid = function() {
       return UNPAID_RE.test(getDetailText());
+    }, detailHasGoodMatch = function() {
+      return false;
     }, getDetailFingerprint = function() {
       const titleLink = document.querySelector('a[href*="/jobs/view/"]');
       if (titleLink) {
@@ -256,13 +259,15 @@
       const existing = badgeTarget.querySelector(".lj-badges");
       if (existing && existing.dataset.r === card.dataset.ljReasons) return;
       clearBadges(card);
+      const borderReason = getBorderReason(reasons);
+      const borderColor = BADGE_COLORS[borderReason] || BADGE_RED;
       target.style.position = "relative";
       target.style.overflow = "visible";
-      target.style.borderLeft = "3px solid " + BADGE_COLOR;
+      target.style.borderLeft = "3px solid " + borderColor;
       if (badgeTarget !== target) {
         badgeTarget.style.position = "relative";
         badgeTarget.style.overflow = "visible";
-        badgeTarget.style.borderLeft = "3px solid " + BADGE_COLOR;
+        badgeTarget.style.borderLeft = "3px solid " + borderColor;
       }
       const container = document.createElement("div");
       container.className = "lj-badges";
@@ -271,7 +276,9 @@
         const badge = document.createElement("span");
         badge.className = "lj-badge";
         badge.textContent = BADGE_DISPLAY[reason] || reason;
-        badge.style.background = BADGE_COLOR;
+        badge.style.background = BADGE_COLORS[reason] || BADGE_RED;
+        const tip = BADGE_TOOLTIP[reason];
+        if (tip) badge.title = tip;
         container.appendChild(badge);
       });
       badgeTarget.appendChild(container);
@@ -353,6 +360,15 @@
       });
       const flagged = document.querySelectorAll("[data-lj-reasons]").length;
       sendBadgeCount(flagged);
+    }, autoSkipCompany = function(card, triggerReason) {
+      const name = getCompanyName(card);
+      if (!name) return;
+      if (skippedCompanies.some((c) => c.toLowerCase() === name.toLowerCase())) return;
+      skippedCompanies.push(name);
+      saveValue("skippedCompanies", skippedCompanies);
+      renderLists();
+      refilterAll();
+      showToast("Auto-skipped: " + name + " (" + (BADGE_DISPLAY[triggerReason] || triggerReason) + ")");
     }, checkDetailForCard = function(card) {
       let labeled = false;
       if (detailPanelHasReposted()) {
@@ -360,9 +376,14 @@
       }
       if (sponsorCheckEnabled && detailHasNoSponsorship()) {
         labeled = labelCard(card, "noSponsor") || labeled;
+        if (autoSkipDetected) autoSkipCompany(card, "noSponsor");
       }
       if (unpaidCheckEnabled && detailHasUnpaid()) {
         labeled = labelCard(card, "unpaid") || labeled;
+        if (autoSkipDetected) autoSkipCompany(card, "unpaid");
+      }
+      if (detailHasGoodMatch()) {
+        labeled = labelCard(card, "goodMatch") || labeled;
       }
       return labeled;
     }, checkDetailPanel = function() {
@@ -484,8 +505,9 @@
         ".lj-card-dimmed{opacity:0.35 !important;transition:opacity 0.2s}",
         ".lj-card-hidden{display:none !important}",
         ".lj-card-dimmed:hover{opacity:0.7 !important}",
-        // Card border (brand rose)
-        "[data-lj-filtered]{border-left:3px solid #D9797B !important;position:relative !important;overflow:visible !important}",
+        // Card flagged: ensure positioning context for the badge container.
+        // Border color is set inline per-reason in applyBadges (red for negative, green for goodMatch).
+        "[data-lj-filtered]{position:relative !important;overflow:visible !important}",
         // Badge container
         ".lj-badges{position:absolute !important;left:0 !important;bottom:4px !important;z-index:10 !important;display:flex !important;flex-direction:column !important;gap:2px !important;pointer-events:none !important}",
         ".lj-badge{font-size:9px !important;font-weight:700 !important;padding:1px 6px !important;border-radius:8px !important;color:#fff !important;white-space:nowrap !important;line-height:1.4 !important;letter-spacing:0.3px !important}",
@@ -862,14 +884,29 @@
       noSponsor: "No Sponsor",
       skippedCompany: "Skipped Co.",
       skippedTitle: "Skipped Title",
-      unpaid: "Unpaid"
+      unpaid: "Unpaid",
+      goodMatch: "Good Match"
     };
-    const BADGE_COLOR = "#D9797B";
-    const BORDER_PRIORITY = ["noSponsor", "reposted", "skippedCompany", "skippedTitle", "applied", "unpaid"];
+    const BADGE_RED = "#D9797B";
+    const BADGE_GREEN = "#5a8a6e";
+    const BADGE_COLORS = {
+      reposted: BADGE_RED,
+      applied: BADGE_RED,
+      noSponsor: BADGE_RED,
+      skippedCompany: BADGE_RED,
+      skippedTitle: BADGE_RED,
+      unpaid: BADGE_RED,
+      goodMatch: BADGE_GREEN
+    };
+    const BADGE_TOOLTIP = {
+      goodMatch: "Job match is high, review match details"
+    };
+    const BORDER_PRIORITY = ["noSponsor", "reposted", "skippedCompany", "skippedTitle", "applied", "unpaid", "goodMatch"];
     let skippedCompanies = [];
     let skippedTitleKeywords = [];
     let sponsorCheckEnabled = true;
     let unpaidCheckEnabled = true;
+    let autoSkipDetected = false;
     let processedCards = /* @__PURE__ */ new WeakSet();
     let lastDetailText = "";
     const labeledJobs = /* @__PURE__ */ new Map();
@@ -889,6 +926,7 @@
         skippedTitleKeywords: _defaults.skippedTitleKeywords || [],
         sponsorCheckEnabled: _defaults.sponsorCheckEnabled ?? true,
         unpaidCheckEnabled: _defaults.unpaidCheckEnabled ?? true,
+        autoSkipDetected: _defaults.autoSkipDetected ?? false,
         hasSeenIntro: false,
         panelPosition: null,
         dimFiltered: _defaults.dimFiltered ?? false,
@@ -898,6 +936,7 @@
       skippedTitleKeywords = data.skippedTitleKeywords;
       sponsorCheckEnabled = data.sponsorCheckEnabled;
       unpaidCheckEnabled = data.unpaidCheckEnabled;
+      autoSkipDetected = data.autoSkipDetected;
       hasSeenIntro = data.hasSeenIntro;
       panelPosition = data.panelPosition;
       cardsDimmed = data.dimFiltered;
@@ -966,17 +1005,6 @@
     } else {
       window.addEventListener("load", () => setTimeout(init, 1500));
     }
-    document.addEventListener("keydown", (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === "S" || e.key === "s")) {
-        e.preventDefault();
-        const panel = document.getElementById("lj-filter-panel");
-        if (panel) {
-          panel.classList.toggle("collapsed");
-          const togBtn = panel.querySelector(".lj-toggle");
-          if (togBtn) togBtn.textContent = panel.classList.contains("collapsed") ? "+" : "\u2212";
-        }
-      }
-    });
     let lastUrl = location.href;
     window.addEventListener("popstate", handleRouteChange);
     const origPushState = history.pushState;
@@ -1016,6 +1044,7 @@
         "skippedTitleKeywords",
         "sponsorCheckEnabled",
         "unpaidCheckEnabled",
+        "autoSkipDetected",
         "dimFiltered",
         "hideFiltered"
       ];
@@ -1026,6 +1055,7 @@
         skippedTitleKeywords: [],
         sponsorCheckEnabled: true,
         unpaidCheckEnabled: true,
+        autoSkipDetected: false,
         dimFiltered: false,
         hideFiltered: false
       }, (data) => {
@@ -1033,6 +1063,7 @@
         skippedTitleKeywords = data.skippedTitleKeywords;
         sponsorCheckEnabled = data.sponsorCheckEnabled;
         unpaidCheckEnabled = data.unpaidCheckEnabled;
+        autoSkipDetected = data.autoSkipDetected;
         cardsDimmed = data.dimFiltered;
         cardsHidden = data.hideFiltered;
         renderLists();

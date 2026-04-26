@@ -19,6 +19,7 @@
     // Jobs page
     sponsorCheckEnabled: true,
     unpaidCheckEnabled: true,
+    autoSkipDetected: false,
     dimFiltered: false,
     hideFiltered: false,
     skippedCompanies: [],
@@ -330,6 +331,7 @@
       var jobsToggles = [
         ["Detect No Sponsor", "sponsorCheckEnabled"],
         ["Detect Unpaid", "unpaidCheckEnabled"],
+        ["Auto-skip Flagged Companies", "autoSkipDetected"],
         ["Dim Filtered Cards", "dimFiltered"],
         ["Hide Filtered Cards", "hideFiltered"]
       ];

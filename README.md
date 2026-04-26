@@ -19,7 +19,6 @@ Clean up LinkedIn: filter feed by keywords, hide ads & spam, mute or unfollow in
 - **Hide Upsells** — removes "Try Campaign Manager" and similar promotions
 - **Unfollow** — inline button next to "· 1st" on posts and interaction headers ("XXX likes this")
 - **Mute Keyword** — right-click any text on LinkedIn → "Mute keyword" to add it to your filter
-- **Keyboard shortcut** — Shift+J to pause/resume all feed filters
 - **Icon Badge** — extension icon shows the filtered count at a glance
 
 ### Job Search (`/jobs/search-results/`)

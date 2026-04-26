@@ -19,6 +19,7 @@
     // Jobs page
     sponsorCheckEnabled: true,
     unpaidCheckEnabled: true,
+    autoSkipDetected: false,
     dimFiltered: false,
     hideFiltered: false,
     skippedCompanies: [],
@@ -310,26 +311,6 @@
           break;
         }
       }
-    }, toggleFeedPause = function() {
-      feedPaused = !feedPaused;
-      if (feedPaused) {
-        feedDoc.body.classList.remove(
-          "lj-hide-promoted",
-          "lj-hide-suggested",
-          "lj-hide-recommended",
-          "lj-hide-non-connections",
-          "lj-hide-sidebar",
-          "lj-hide-polls",
-          "lj-hide-celebrations",
-          "lj-hide-keyword-filtered",
-          "lj-hide-old-posts"
-        );
-        showToast("Filters paused (Shift+J to resume)");
-      } else {
-        applyBodyClasses();
-        scanPosts();
-        showToast("Filters resumed");
-      }
     }, showToast = function(msg, onUndo) {
       let toast = feedDoc.getElementById("lj-feed-toast");
       if (!toast) {
@@ -616,15 +597,6 @@
       "birthday"
     ];
     let pendingStats = {};
-    let feedPaused = false;
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "J" && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        const tag = (e.target.tagName || "").toLowerCase();
-        if (tag === "input" || tag === "textarea" || e.target.isContentEditable) return;
-        e.preventDefault();
-        toggleFeedPause();
-      }
-    });
     let toastTimer = null;
     let profileInitialized = false;
     let networkInitialized = false;

@@ -391,18 +391,31 @@
     list.push(item);
     return true;
   }
+  function escapeRegex(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  function matchesWholeWord(haystack, needle) {
+    if (typeof haystack !== "string" || typeof needle !== "string") return false;
+    if (haystack.length === 0 || needle.length === 0) return false;
+    return new RegExp(`(?<!\\w)${escapeRegex(needle)}(?!\\w)`, "i").test(haystack);
+  }
+  function containsWordOf(text, list) {
+    if (!list || list.length === 0) return false;
+    if (typeof text !== "string" || text.length === 0) return false;
+    return list.some((item) => matchesWholeWord(text, item));
+  }
 
   // src/jobs/labels.js
   function isSkippedCompany(card) {
     const name = getCompanyName(card);
     if (!name) return false;
-    return containsCi(state.skippedCompanies, name);
+    return containsWordOf(name, state.skippedCompanies);
   }
   function isSkippedTitle(card) {
     if (state.skippedTitleKeywords.length === 0) return false;
-    const title = getJobTitle(card).toLowerCase();
+    const title = getJobTitle(card);
     if (!title) return false;
-    return state.skippedTitleKeywords.some((kw) => title.includes(kw.toLowerCase()));
+    return containsWordOf(title, state.skippedTitleKeywords);
   }
   function labelCard(card, reason) {
     const existing = card.dataset.ljReasons ? card.dataset.ljReasons.split(",") : [];

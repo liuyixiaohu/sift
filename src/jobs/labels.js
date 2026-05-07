@@ -20,20 +20,31 @@ import {
   getVisibleEl,
 } from "./dom.js";
 import { incrementStat, saveValue } from "./storage.js";
-import { addUnique, containsCi } from "../shared/lists.js";
+import { addUnique, containsWordOf } from "../shared/lists.js";
 
 // ==================== Skip-list checks ====================
+// Both checks use whole-word matching (containsWordOf) so a skip term matches
+// when it appears as a complete word in the company name or job title — not
+// when it's a strict equal nor when it's just a substring of another word.
+//
+//   skippedCompanies: ["Apple"]
+//     matches "Apple", "Apple Inc", "Apple Computer"     — yes
+//     matches "Pineapple"                                — no
+//
+//   skippedTitleKeywords: ["intern"]
+//     matches "Software Intern", "Intern – Frontend"     — yes
+//     matches "Internship Coordinator", "Internal Tools" — no
 export function isSkippedCompany(card) {
   const name = getCompanyName(card);
   if (!name) return false;
-  return containsCi(state.skippedCompanies, name);
+  return containsWordOf(name, state.skippedCompanies);
 }
 
 export function isSkippedTitle(card) {
   if (state.skippedTitleKeywords.length === 0) return false;
-  const title = getJobTitle(card).toLowerCase();
+  const title = getJobTitle(card);
   if (!title) return false;
-  return state.skippedTitleKeywords.some((kw) => title.includes(kw.toLowerCase()));
+  return containsWordOf(title, state.skippedTitleKeywords);
 }
 
 // ==================== Label / badge rendering ====================

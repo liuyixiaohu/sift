@@ -383,9 +383,25 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
   function detailHasNoSponsorship() { return NO_SPONSOR_RE.test(getDetailText()); }
   function detailHasUnpaid() { return UNPAID_RE.test(getDetailText()); }
 
-  // Returns true when LinkedIn signals this job is a strong match for the user.
-  // TODO(user): fill in the detection logic. See request below the file edit for guidance.
+  // LinkedIn Premium's "Assessing your job match" panel announces the match
+  // tier in a single leaf <p>. Verified phrasing on real DOM:
+  //   HIGH (we fire goodMatch): "Your profile and resume match the required qualifications well."
+  //   LOW  (don't fire):        "Your profile and resume are missing some qualifications..."
+  // We detect HIGH only — the unique substring is "match the required qualifications well".
+  // The match panel lives outside "About the job" (its own <h2> "Assessing your job
+  // match"), so getDetailText() can't see it — we scope a small <p> scan to <main>/<article>.
+  // Also note: the Premium panel loads asynchronously (~5–8 s) after the user clicks
+  // a card, so checkDetailPanel() must re-evaluate goodMatch on later mutations even
+  // when the panel fingerprint is stable (see that function).
+  const GOOD_MATCH_RE = /match the required qualifications well/i;
   function detailHasGoodMatch() {
+    const ps = document.querySelectorAll("main p, article p");
+    for (const p of ps) {
+      if (p.children.length > 0) continue;
+      const t = p.textContent;
+      if (t.length < 30) continue;
+      if (GOOD_MATCH_RE.test(t)) return true;
+    }
     return false;
   }
 
@@ -627,17 +643,30 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
   // ==================== Passive Detail Panel Detection (triggered when user clicks a card) ====================
   function checkDetailPanel() {
     const fingerprint = getDetailFingerprint();
-    if (!fingerprint || fingerprint === lastDetailText) return;
+    if (!fingerprint) return;
 
     const activeCard = getActiveCard();
     if (!activeCard) return;
-    // Only consume fingerprint after successful card match
-    lastDetailText = fingerprint;
 
-    const labeled = checkDetailForCard(activeCard);
-    if (labeled && !scanning) {
-      const reasons = (activeCard.dataset.ljReasons || "").split(",");
-      showToast("Flagged: " + reasons.map(r => BADGE_DISPLAY[r] || r).join(", "));
+    if (fingerprint !== lastDetailText) {
+      // New job selected — consume fingerprint and run the full detection pass.
+      lastDetailText = fingerprint;
+      const labeled = checkDetailForCard(activeCard);
+      if (labeled && !scanning) {
+        const reasons = (activeCard.dataset.ljReasons || "").split(",");
+        showToast("Flagged: " + reasons.map(r => BADGE_DISPLAY[r] || r).join(", "));
+      }
+      return;
+    }
+
+    // Same job still selected. The Premium "Assessing your job match" panel loads
+    // asynchronously after the click (typically ~5–8 s), so the goodMatch detector
+    // is the only one that can flip from false to true on later observer ticks.
+    // Re-evaluate just goodMatch — cheap (early-returns on first matching <p>).
+    const reasons = (activeCard.dataset.ljReasons || "").split(",");
+    if (!reasons.includes("goodMatch") && detailHasGoodMatch()) {
+      labelCard(activeCard, "goodMatch");
+      if (!scanning) showToast("Flagged: " + BADGE_DISPLAY.goodMatch);
     }
   }
 

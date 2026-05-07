@@ -222,6 +222,13 @@
     }, detailHasUnpaid = function() {
       return UNPAID_RE.test(getDetailText());
     }, detailHasGoodMatch = function() {
+      const ps = document.querySelectorAll("main p, article p");
+      for (const p of ps) {
+        if (p.children.length > 0) continue;
+        const t = p.textContent;
+        if (t.length < 30) continue;
+        if (GOOD_MATCH_RE.test(t)) return true;
+      }
       return false;
     }, getDetailFingerprint = function() {
       const titleLink = document.querySelector('a[href*="/jobs/view/"]');
@@ -394,14 +401,22 @@
       return labeled;
     }, checkDetailPanel = function() {
       const fingerprint = getDetailFingerprint();
-      if (!fingerprint || fingerprint === lastDetailText) return;
+      if (!fingerprint) return;
       const activeCard = getActiveCard();
       if (!activeCard) return;
-      lastDetailText = fingerprint;
-      const labeled = checkDetailForCard(activeCard);
-      if (labeled && !scanning) {
-        const reasons = (activeCard.dataset.ljReasons || "").split(",");
-        showToast("Flagged: " + reasons.map((r) => BADGE_DISPLAY[r] || r).join(", "));
+      if (fingerprint !== lastDetailText) {
+        lastDetailText = fingerprint;
+        const labeled = checkDetailForCard(activeCard);
+        if (labeled && !scanning) {
+          const reasons2 = (activeCard.dataset.ljReasons || "").split(",");
+          showToast("Flagged: " + reasons2.map((r) => BADGE_DISPLAY[r] || r).join(", "));
+        }
+        return;
+      }
+      const reasons = (activeCard.dataset.ljReasons || "").split(",");
+      if (!reasons.includes("goodMatch") && detailHasGoodMatch()) {
+        labelCard(activeCard, "goodMatch");
+        if (!scanning) showToast("Flagged: " + BADGE_DISPLAY.goodMatch);
       }
     }, clickCard = function(card) {
       if (!card) return;
@@ -951,6 +966,7 @@
     let pendingStats = {};
     let flushTimer = null;
     const BADGE_TEXTS = new Set(Object.values(BADGE_DISPLAY));
+    const GOOD_MATCH_RE = /match the required qualifications well/i;
     async function autoScanCards() {
       if (scanning) {
         scanAbort = true;

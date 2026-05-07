@@ -1,4 +1,15 @@
 import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
+import {
+  estimateBytes,
+  formatBytes,
+  getStorageUsage,
+  migrate,
+  SCHEMA_VERSION,
+  STORAGE_BLOCK_FRACTION,
+  STORAGE_QUOTA_BYTES,
+  STORAGE_WARN_FRACTION,
+  validateImport,
+} from "./shared/schema.js";
 
 (function () {
   "use strict";
@@ -508,6 +519,26 @@ import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
 
   // === Data Tab ===
 
+  // Re-render the storage-usage row in place. Called after every successful
+  // import/reset so the gauge reflects the new state without a full rebuild.
+  async function refreshStorageUsage(usageEl) {
+    if (!usageEl) return;
+    const bytes = await getStorageUsage();
+    const fraction = bytes / STORAGE_QUOTA_BYTES;
+    let level = "ok";
+    if (fraction >= STORAGE_BLOCK_FRACTION) level = "block";
+    else if (fraction >= STORAGE_WARN_FRACTION) level = "warn";
+    usageEl.dataset.level = level;
+    usageEl.textContent =
+      "Storage used: " +
+      formatBytes(bytes) +
+      " of " +
+      formatBytes(STORAGE_QUOTA_BYTES) +
+      " (" +
+      Math.round(fraction * 100) +
+      "%)";
+  }
+
   function buildDataTab() {
     let container = document.getElementById("tab-data");
     container.innerHTML = "";
@@ -515,12 +546,20 @@ import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
     let section = document.createElement("div");
     section.className = "data-section";
 
-    // Export
+    // Storage usage indicator (always visible — context for what import will affect).
+    let usageEl = document.createElement("div");
+    usageEl.className = "data-storage-usage";
+    usageEl.dataset.level = "ok";
+    refreshStorageUsage(usageEl);
+
+    // Export — adds the current `schemaVersion` if missing so future imports
+    // can migrate cleanly. Existing data is otherwise unchanged.
     let exportBtn = document.createElement("button");
     exportBtn.className = "data-btn data-btn-export";
     exportBtn.textContent = "Export Backup";
     exportBtn.addEventListener("click", function () {
       chrome.storage.local.get(null, function (data) {
+        if (typeof data.schemaVersion !== "number") data.schemaVersion = SCHEMA_VERSION;
         let json = JSON.stringify(data, null, 2);
         let blob = new Blob([json], { type: "application/json" });
         let url = URL.createObjectURL(blob);
@@ -537,7 +576,7 @@ import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
     exportDesc.className = "data-description";
     exportDesc.textContent = "Download all settings and stats as JSON";
 
-    // Import
+    // Import — validates payload, migrates schema, pre-flights against quota.
     let fileInput = document.createElement("input");
     fileInput.type = "file";
     fileInput.accept = ".json";
@@ -550,38 +589,91 @@ import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
       fileInput.click();
     });
 
-    fileInput.addEventListener("change", function () {
+    fileInput.addEventListener("change", async function () {
       let file = fileInput.files[0];
       if (!file) return;
-      let reader = new FileReader();
-      reader.onload = function (e) {
-        try {
-          let data = JSON.parse(e.target.result);
-          chrome.storage.local.set(data, function () {
-            showToast("Backup imported successfully");
-            // Reload the controls tab to reflect new settings
-            loadAndBuild();
-          });
-        } catch (err) {
-          showToast("Invalid JSON file");
-        }
-      };
-      reader.readAsText(file);
+
+      // Reset the input early so the same file can be re-selected after a fix.
+      const fileName = file.name;
       fileInput.value = "";
+
+      let parsed;
+      try {
+        parsed = JSON.parse(await file.text());
+      } catch {
+        showToast("Invalid JSON file: " + fileName);
+        return;
+      }
+
+      const validation = validateImport(parsed);
+      if (!validation.ok) {
+        // Show the first error — full list goes to console for debugging.
+        console.error("[Sift] Import validation failed:", validation.errors);
+        showToast("Import rejected: " + validation.errors[0]);
+        return;
+      }
+
+      const migrated = migrate(validation.data);
+
+      // Pre-flight quota check: refuse imports that would push usage past
+      // STORAGE_BLOCK_FRACTION. Note that `set()` overwrites these keys
+      // rather than appending, so the relevant comparison is the import
+      // size + bytes from any keys we won't be touching.
+      const importedBytes = estimateBytes(migrated);
+      const currentBytes = await getStorageUsage();
+      const importKeys = new Set(Object.keys(migrated));
+      const allCurrent = await new Promise((r) =>
+        chrome.storage.local.get(null, r)
+      );
+      const untouchedBytes = estimateBytes(
+        Object.fromEntries(
+          Object.entries(allCurrent).filter(([k]) => !importKeys.has(k))
+        )
+      );
+      const projected = importedBytes + untouchedBytes;
+      if (projected > STORAGE_QUOTA_BYTES * STORAGE_BLOCK_FRACTION) {
+        showToast(
+          "Import would exceed " +
+            Math.round(STORAGE_BLOCK_FRACTION * 100) +
+            "% of storage quota (" +
+            formatBytes(projected) +
+            "). Aborted."
+        );
+        return;
+      }
+
+      chrome.storage.local.set(migrated, function () {
+        const warn = projected > STORAGE_QUOTA_BYTES * STORAGE_WARN_FRACTION;
+        showToast(
+          warn
+            ? "Imported, but storage now " + formatBytes(projected) + " — close to quota."
+            : "Backup imported successfully"
+        );
+        refreshStorageUsage(usageEl);
+        // Reload the controls tab to reflect new settings.
+        loadAndBuild();
+        void currentBytes; // currentBytes captured for telemetry — kept to make intent clear.
+      });
     });
 
     let importDesc = document.createElement("div");
     importDesc.className = "data-description";
-    importDesc.textContent = "Restore from a previously exported backup";
+    importDesc.textContent =
+      "Restore from a previously exported backup. Older backups (no schema version) are auto-migrated.";
 
     // Reset
     let resetBtn = document.createElement("button");
     resetBtn.className = "data-btn data-btn-reset";
     resetBtn.textContent = "Reset All Data";
     resetBtn.addEventListener("click", function () {
-      if (confirm("Are you sure you want to reset all Sift settings and stats? This cannot be undone.")) {
+      if (
+        confirm(
+          "Are you sure you want to reset all Sift settings and stats? This cannot be undone."
+        )
+      ) {
         chrome.storage.local.clear(function () {
           showToast("All data cleared");
+          refreshStorageUsage(usageEl);
           loadAndBuild();
         });
       }
@@ -591,6 +683,7 @@ import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
     resetDesc.className = "data-description";
     resetDesc.textContent = "Clear all settings, lists, and stats";
 
+    section.appendChild(usageEl);
     section.appendChild(exportBtn);
     section.appendChild(exportDesc);
     section.appendChild(importBtn);

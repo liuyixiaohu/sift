@@ -1,6 +1,9 @@
 (() => {
   // src/shared/defaults.js
   var SIFT_DEFAULTS = {
+    // Storage schema version — bumped via src/shared/schema.js#migrate when
+    // the shape of stored data changes. New installs start at the latest.
+    schemaVersion: 1,
     // Feed page
     hidePromoted: true,
     hideSuggested: true,
@@ -26,6 +29,18 @@
     skippedTitleKeywords: []
   };
 
+  // src/shared/schema.js
+  var SCHEMA_VERSION = 1;
+  var STORAGE_QUOTA_BYTES = 10 * 1024 * 1024;
+  function migrate(data) {
+    const v = typeof data.schemaVersion === "number" ? data.schemaVersion : 0;
+    if (v >= SCHEMA_VERSION) return data;
+    if (v < 1) {
+      data.schemaVersion = 1;
+    }
+    return data;
+  }
+
   // src/background.js
   chrome.runtime.onInstalled.addListener(() => {
     chrome.contextMenus.create({
@@ -33,6 +48,12 @@
       title: 'Mute "%s" in feed',
       contexts: ["selection"],
       documentUrlPatterns: ["https://www.linkedin.com/*"]
+    });
+    chrome.storage.local.get(null, (data) => {
+      const before = typeof data.schemaVersion === "number" ? data.schemaVersion : 0;
+      if (before >= SCHEMA_VERSION) return;
+      const migrated = migrate({ ...data });
+      chrome.storage.local.set(migrated);
     });
   });
   chrome.contextMenus.onClicked.addListener((info) => {

@@ -1,6 +1,9 @@
 (() => {
   // src/shared/defaults.js
   var SIFT_DEFAULTS = {
+    // Storage schema version — bumped via src/shared/schema.js#migrate when
+    // the shape of stored data changes. New installs start at the latest.
+    schemaVersion: 1,
     // Feed page
     hidePromoted: true,
     hideSuggested: true,
@@ -50,6 +53,115 @@
       jobsScanned: 0
     }
   };
+
+  // src/shared/schema.js
+  var SCHEMA_VERSION = 1;
+  var STORAGE_QUOTA_BYTES = 10 * 1024 * 1024;
+  var STORAGE_WARN_FRACTION = 0.8;
+  var STORAGE_BLOCK_FRACTION = 0.95;
+  var SCHEMA_TYPES = {
+    // Schema version itself
+    schemaVersion: "number",
+    // Feed-page toggles
+    hidePromoted: "boolean",
+    hideSuggested: "boolean",
+    hideRecommended: "boolean",
+    hideNonConnections: "boolean",
+    hideSidebar: "boolean",
+    hidePolls: "boolean",
+    hideCelebrations: "boolean",
+    feedKeywordFilterEnabled: "boolean",
+    hasSeenOnboarding: "boolean",
+    postAgeLimit: "number",
+    feedKeywords: "string[]",
+    // Profile-page toggles
+    hideProfileAnalytics: "boolean",
+    // Jobs-page toggles + lists
+    sponsorCheckEnabled: "boolean",
+    unpaidCheckEnabled: "boolean",
+    autoSkipDetected: "boolean",
+    dimFiltered: "boolean",
+    hideFiltered: "boolean",
+    skippedCompanies: "string[]",
+    skippedTitleKeywords: "string[]",
+    // Stats
+    stats: "object",
+    statsAllTime: "object"
+  };
+  function checkType(value, expected) {
+    switch (expected) {
+      case "boolean":
+      case "number":
+      case "string":
+        return typeof value === expected;
+      case "string[]":
+        return Array.isArray(value) && value.every((v) => typeof v === "string");
+      case "object":
+        return value !== null && typeof value === "object" && !Array.isArray(value);
+      default:
+        return true;
+    }
+  }
+  function validateImport(data) {
+    const errors = [];
+    if (data === null || typeof data !== "object" || Array.isArray(data)) {
+      return { ok: false, errors: ["Top-level value must be an object."] };
+    }
+    for (const [key, expected] of Object.entries(SCHEMA_TYPES)) {
+      if (!(key in data)) continue;
+      if (!checkType(data[key], expected)) {
+        errors.push(`"${key}" should be ${humanType(expected)}, got ${humanActual(data[key])}.`);
+      }
+    }
+    const MAX_LIST_LEN = 1e5;
+    for (const k of ["skippedCompanies", "skippedTitleKeywords", "feedKeywords"]) {
+      if (Array.isArray(data[k]) && data[k].length > MAX_LIST_LEN) {
+        errors.push(`"${k}" has ${data[k].length} entries (max ${MAX_LIST_LEN}).`);
+      }
+    }
+    if (errors.length > 0) return { ok: false, errors };
+    return { ok: true, data };
+  }
+  function humanType(expected) {
+    if (expected === "string[]") return "an array of strings";
+    if (expected === "object") return "an object";
+    return "a " + expected;
+  }
+  function humanActual(value) {
+    if (value === null) return "null";
+    if (Array.isArray(value)) return `an array (length ${value.length})`;
+    return typeof value;
+  }
+  function migrate(data) {
+    const v = typeof data.schemaVersion === "number" ? data.schemaVersion : 0;
+    if (v >= SCHEMA_VERSION) return data;
+    if (v < 1) {
+      data.schemaVersion = 1;
+    }
+    return data;
+  }
+  function estimateBytes(data) {
+    try {
+      return new Blob([JSON.stringify(data)]).size;
+    } catch {
+      return 0;
+    }
+  }
+  function formatBytes(bytes) {
+    if (!Number.isFinite(bytes) || bytes < 0) return "\u2014";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  }
+  function getStorageUsage() {
+    return new Promise((resolve) => {
+      if (!chrome?.storage?.local?.getBytesInUse) {
+        resolve(0);
+        return;
+      }
+      chrome.storage.local.getBytesInUse(null, (bytes) => resolve(bytes || 0));
+    });
+  }
 
   // src/popup.js
   (function() {
@@ -460,16 +572,31 @@
         statsInterval = null;
       }
     }
+    async function refreshStorageUsage(usageEl) {
+      if (!usageEl) return;
+      const bytes = await getStorageUsage();
+      const fraction = bytes / STORAGE_QUOTA_BYTES;
+      let level = "ok";
+      if (fraction >= STORAGE_BLOCK_FRACTION) level = "block";
+      else if (fraction >= STORAGE_WARN_FRACTION) level = "warn";
+      usageEl.dataset.level = level;
+      usageEl.textContent = "Storage used: " + formatBytes(bytes) + " of " + formatBytes(STORAGE_QUOTA_BYTES) + " (" + Math.round(fraction * 100) + "%)";
+    }
     function buildDataTab() {
       let container = document.getElementById("tab-data");
       container.innerHTML = "";
       let section = document.createElement("div");
       section.className = "data-section";
+      let usageEl = document.createElement("div");
+      usageEl.className = "data-storage-usage";
+      usageEl.dataset.level = "ok";
+      refreshStorageUsage(usageEl);
       let exportBtn = document.createElement("button");
       exportBtn.className = "data-btn data-btn-export";
       exportBtn.textContent = "Export Backup";
       exportBtn.addEventListener("click", function() {
         chrome.storage.local.get(null, function(data) {
+          if (typeof data.schemaVersion !== "number") data.schemaVersion = SCHEMA_VERSION;
           let json = JSON.stringify(data, null, 2);
           let blob = new Blob([json], { type: "application/json" });
           let url = URL.createObjectURL(blob);
@@ -494,34 +621,66 @@
       importBtn.addEventListener("click", function() {
         fileInput.click();
       });
-      fileInput.addEventListener("change", function() {
+      fileInput.addEventListener("change", async function() {
         let file = fileInput.files[0];
         if (!file) return;
-        let reader = new FileReader();
-        reader.onload = function(e) {
-          try {
-            let data = JSON.parse(e.target.result);
-            chrome.storage.local.set(data, function() {
-              showToast("Backup imported successfully");
-              loadAndBuild();
-            });
-          } catch (err) {
-            showToast("Invalid JSON file");
-          }
-        };
-        reader.readAsText(file);
+        const fileName = file.name;
         fileInput.value = "";
+        let parsed;
+        try {
+          parsed = JSON.parse(await file.text());
+        } catch {
+          showToast("Invalid JSON file: " + fileName);
+          return;
+        }
+        const validation = validateImport(parsed);
+        if (!validation.ok) {
+          console.error("[Sift] Import validation failed:", validation.errors);
+          showToast("Import rejected: " + validation.errors[0]);
+          return;
+        }
+        const migrated = migrate(validation.data);
+        const importedBytes = estimateBytes(migrated);
+        const currentBytes = await getStorageUsage();
+        const importKeys = new Set(Object.keys(migrated));
+        const allCurrent = await new Promise(
+          (r) => chrome.storage.local.get(null, r)
+        );
+        const untouchedBytes = estimateBytes(
+          Object.fromEntries(
+            Object.entries(allCurrent).filter(([k]) => !importKeys.has(k))
+          )
+        );
+        const projected = importedBytes + untouchedBytes;
+        if (projected > STORAGE_QUOTA_BYTES * STORAGE_BLOCK_FRACTION) {
+          showToast(
+            "Import would exceed " + Math.round(STORAGE_BLOCK_FRACTION * 100) + "% of storage quota (" + formatBytes(projected) + "). Aborted."
+          );
+          return;
+        }
+        chrome.storage.local.set(migrated, function() {
+          const warn = projected > STORAGE_QUOTA_BYTES * STORAGE_WARN_FRACTION;
+          showToast(
+            warn ? "Imported, but storage now " + formatBytes(projected) + " \u2014 close to quota." : "Backup imported successfully"
+          );
+          refreshStorageUsage(usageEl);
+          loadAndBuild();
+          void currentBytes;
+        });
       });
       let importDesc = document.createElement("div");
       importDesc.className = "data-description";
-      importDesc.textContent = "Restore from a previously exported backup";
+      importDesc.textContent = "Restore from a previously exported backup. Older backups (no schema version) are auto-migrated.";
       let resetBtn = document.createElement("button");
       resetBtn.className = "data-btn data-btn-reset";
       resetBtn.textContent = "Reset All Data";
       resetBtn.addEventListener("click", function() {
-        if (confirm("Are you sure you want to reset all Sift settings and stats? This cannot be undone.")) {
+        if (confirm(
+          "Are you sure you want to reset all Sift settings and stats? This cannot be undone."
+        )) {
           chrome.storage.local.clear(function() {
             showToast("All data cleared");
+            refreshStorageUsage(usageEl);
             loadAndBuild();
           });
         }
@@ -529,6 +688,7 @@
       let resetDesc = document.createElement("div");
       resetDesc.className = "data-description";
       resetDesc.textContent = "Clear all settings, lists, and stats";
+      section.appendChild(usageEl);
       section.appendChild(exportBtn);
       section.appendChild(exportDesc);
       section.appendChild(importBtn);

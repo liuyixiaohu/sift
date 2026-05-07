@@ -380,11 +380,23 @@
     return text ? text.trim().substring(0, 200) : "";
   }
 
+  // src/shared/lists.js
+  function containsCi(list, item) {
+    if (!list || typeof item !== "string") return false;
+    const lower = item.toLowerCase();
+    return list.some((x) => typeof x === "string" && x.toLowerCase() === lower);
+  }
+  function addUnique(list, item) {
+    if (containsCi(list, item)) return false;
+    list.push(item);
+    return true;
+  }
+
   // src/jobs/labels.js
   function isSkippedCompany(card) {
-    const name = getCompanyName(card).toLowerCase();
+    const name = getCompanyName(card);
     if (!name) return false;
-    return state.skippedCompanies.some((b) => name === b.toLowerCase());
+    return containsCi(state.skippedCompanies, name);
   }
   function isSkippedTitle(card) {
     if (state.skippedTitleKeywords.length === 0) return false;
@@ -506,8 +518,7 @@
   function autoSkipCompany(card, triggerReason, { renderLists: renderLists2, showToast: showToast2 }) {
     const name = getCompanyName(card);
     if (!name) return;
-    if (state.skippedCompanies.some((c) => c.toLowerCase() === name.toLowerCase())) return;
-    state.skippedCompanies.push(name);
+    if (!addUnique(state.skippedCompanies, name)) return;
     saveValue("skippedCompanies", state.skippedCompanies);
     renderLists2();
     refilterAll();
@@ -921,10 +932,7 @@
       const items = raw.split(/[,\n]+/).map((s) => s.trim()).filter(Boolean);
       let added = 0;
       items.forEach((name) => {
-        if (!list.some((c) => c.toLowerCase() === name.toLowerCase())) {
-          list.push(name);
-          added++;
-        }
+        if (addUnique(list, name)) added++;
       });
       if (added > 0) {
         saveValue(storageKey, list);
@@ -1018,7 +1026,7 @@
       showToast("Could not detect company name");
       return;
     }
-    if (state.skippedCompanies.some((c) => c.toLowerCase() === name.toLowerCase())) {
+    if (containsCi(state.skippedCompanies, name)) {
       showToast("\u201C" + name + "\u201D already skipped");
       return;
     }

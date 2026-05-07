@@ -1,4 +1,5 @@
 import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
+import { addUnique, removeCi } from "./shared/lists.js";
 import {
   estimateBytes,
   formatBytes,
@@ -300,32 +301,37 @@ import {
     kwAddRow.appendChild(kwAddBtn);
     feedGroup.appendChild(kwAddRow);
 
-    let renderFeedKw = createListSection(feedGroup, "Feed Keywords", settings.feedKeywords || [], function (kw) {
-      settings.feedKeywords = (settings.feedKeywords || []).filter(function (k) {
-        return k.toLowerCase() !== kw.toLowerCase();
-      });
-      chrome.storage.local.set({ feedKeywords: settings.feedKeywords });
-      renderFeedKw(settings.feedKeywords);
-    });
+    let renderFeedKw = createListSection(
+      feedGroup,
+      "Feed Keywords",
+      settings.feedKeywords || [],
+      function (kw) {
+        settings.feedKeywords = settings.feedKeywords || [];
+        removeCi(settings.feedKeywords, kw);
+        chrome.storage.local.set({ feedKeywords: settings.feedKeywords });
+        renderFeedKw(settings.feedKeywords);
+      }
+    );
     renderFeedKw(settings.feedKeywords || []);
 
     function addFeedKeywords() {
       let val = kwInput.value.trim();
       if (!val) return;
-      let newKws = val.split(",").map(function (s) { return s.trim(); }).filter(Boolean);
-      let existing = (settings.feedKeywords || []).map(function (k) { return k.toLowerCase(); });
-      let added = [];
+      if (!settings.feedKeywords) settings.feedKeywords = [];
+      const newKws = val
+        .split(",")
+        .map(function (s) {
+          return s.trim();
+        })
+        .filter(Boolean);
+      let added = 0;
       newKws.forEach(function (kw) {
-        if (!existing.includes(kw.toLowerCase())) {
-          existing.push(kw.toLowerCase());
-          added.push(kw);
-        }
+        if (addUnique(settings.feedKeywords, kw)) added++;
       });
-      if (added.length > 0) {
-        settings.feedKeywords = (settings.feedKeywords || []).concat(added);
+      if (added > 0) {
         chrome.storage.local.set({ feedKeywords: settings.feedKeywords });
         renderFeedKw(settings.feedKeywords);
-        showToast(added.length + " keyword" + (added.length > 1 ? "s" : "") + " added");
+        showToast(added + " keyword" + (added > 1 ? "s" : "") + " added");
       }
       kwInput.value = "";
     }
@@ -370,23 +376,29 @@ import {
     });
 
     // Skipped Companies list
-    let renderCompanies = createListSection(jobsGroup, "Skipped Companies", settings.skippedCompanies, function (company) {
-      settings.skippedCompanies = settings.skippedCompanies.filter(function (c) {
-        return c.toLowerCase() !== company.toLowerCase();
-      });
-      chrome.storage.local.set({ skippedCompanies: settings.skippedCompanies });
-      renderCompanies(settings.skippedCompanies);
-    });
+    let renderCompanies = createListSection(
+      jobsGroup,
+      "Skipped Companies",
+      settings.skippedCompanies,
+      function (company) {
+        removeCi(settings.skippedCompanies, company);
+        chrome.storage.local.set({ skippedCompanies: settings.skippedCompanies });
+        renderCompanies(settings.skippedCompanies);
+      }
+    );
     renderCompanies(settings.skippedCompanies);
 
     // Skipped Title Keywords list
-    let renderTitleKw = createListSection(jobsGroup, "Skipped Title Keywords", settings.skippedTitleKeywords, function (kw) {
-      settings.skippedTitleKeywords = settings.skippedTitleKeywords.filter(function (k) {
-        return k.toLowerCase() !== kw.toLowerCase();
-      });
-      chrome.storage.local.set({ skippedTitleKeywords: settings.skippedTitleKeywords });
-      renderTitleKw(settings.skippedTitleKeywords);
-    });
+    let renderTitleKw = createListSection(
+      jobsGroup,
+      "Skipped Title Keywords",
+      settings.skippedTitleKeywords,
+      function (kw) {
+        removeCi(settings.skippedTitleKeywords, kw);
+        chrome.storage.local.set({ skippedTitleKeywords: settings.skippedTitleKeywords });
+        renderTitleKw(settings.skippedTitleKeywords);
+      }
+    );
     renderTitleKw(settings.skippedTitleKeywords);
 
     container.appendChild(jobsGroup);

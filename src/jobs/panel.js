@@ -10,6 +10,7 @@ import { getActiveCard } from "./active.js";
 import { getBorderReason } from "./constants.js";
 import { autoScanCards } from "./scan.js";
 import { showToast } from "./toast.js";
+import { addUnique, containsCi } from "../shared/lists.js";
 
 // ==================== DOM-builder helper ====================
 export function el(tag, attrs, children) {
@@ -194,7 +195,9 @@ export function createUI() {
     },
   });
 
-  // Batch add (supports comma/newline-separated paste).
+  // Batch add (supports comma/newline-separated paste). addUnique mutates the
+  // list in place, so successive items in the same paste also dedupe against
+  // each other (e.g. "Acme, ACME, acme" → only one entry added).
   function batchAdd(raw, list, storageKey) {
     const items = raw
       .split(/[,\n]+/)
@@ -202,10 +205,7 @@ export function createUI() {
       .filter(Boolean);
     let added = 0;
     items.forEach((name) => {
-      if (!list.some((c) => c.toLowerCase() === name.toLowerCase())) {
-        list.push(name);
-        added++;
-      }
+      if (addUnique(list, name)) added++;
     });
     if (added > 0) {
       saveValue(storageKey, list);
@@ -312,7 +312,7 @@ export function skipCurrentCompany() {
     showToast("Could not detect company name");
     return;
   }
-  if (state.skippedCompanies.some((c) => c.toLowerCase() === name.toLowerCase())) {
+  if (containsCi(state.skippedCompanies, name)) {
     showToast("“" + name + "” already skipped");
     return;
   }

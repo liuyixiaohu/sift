@@ -88,10 +88,6 @@
     }
   }
 
-  // src/shared/badge.js
-  function sendBadgeCount() {
-  }
-
   // src/feed.js
   if (chrome.runtime?.id) {
     let isFeedPage = function() {
@@ -379,7 +375,6 @@
       badge.textContent = count > 0 ? "\u{1F50D} " + count + " filtered" : "\u{1F50D} Sift";
       const tip = feedDoc.getElementById("lj-badge-tip");
       if (tip && tip.classList.contains("visible")) updateBreakdown();
-      sendBadgeCount(count);
     }, applyProfileClasses = function() {
       document.body.classList.toggle("lj-hide-sidebar", settings.hideSidebar);
       document.body.classList.toggle("lj-hide-profile-analytics", settings.hideProfileAnalytics);
@@ -541,7 +536,6 @@
       } else {
         initialized = false;
         feedDoc = document;
-        sendBadgeCount(0);
         if (sidebarInterval) clearInterval(sidebarInterval);
         if (iframeCheckInterval) clearInterval(iframeCheckInterval);
         if (scanInterval) {

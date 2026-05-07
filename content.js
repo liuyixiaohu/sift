@@ -300,8 +300,15 @@
     return lines.length >= 2 ? lines[1] : "";
   }
   var BADGE_TEXTS = new Set(Object.values(BADGE_DISPLAY));
+  var cardTextLinesCache = /* @__PURE__ */ new WeakMap();
+  function clearCardTextCache() {
+    cardTextLinesCache = /* @__PURE__ */ new WeakMap();
+  }
   function getCardTextLines(card) {
-    return card.innerText.split("\n").map((l) => l.trim()).filter((l) => l && l !== "\xB7" && !BADGE_TEXTS.has(l));
+    if (cardTextLinesCache.has(card)) return cardTextLinesCache.get(card);
+    const lines = card.innerText.split("\n").map((l) => l.trim()).filter((l) => l && l !== "\xB7" && !BADGE_TEXTS.has(l));
+    cardTextLinesCache.set(card, lines);
+    return lines;
   }
   function cardHasRepostedText(card) {
     return card.textContent.toLowerCase().includes("reposted");
@@ -371,10 +378,6 @@
     }
     const text = getDetailText();
     return text ? text.trim().substring(0, 200) : "";
-  }
-
-  // src/shared/badge.js
-  function sendBadgeCount() {
   }
 
   // src/jobs/labels.js
@@ -452,6 +455,7 @@
     else if (state.cardsDimmed) target.classList.add("lj-card-dimmed");
   }
   function refreshBadges() {
+    clearCardTextCache();
     document.querySelectorAll("[data-lj-reasons]").forEach((card) => {
       const badgeTarget = getLastVisibleEl(card);
       const existing = badgeTarget.querySelector(".lj-badges");
@@ -474,6 +478,7 @@
     }
   }
   function filterJobCards() {
+    clearCardTextCache();
     const cards = getJobCards();
     cards.forEach((card) => {
       if (!card.dataset.ljReasons?.includes("applied") && cardHasAppliedText(card)) {
@@ -489,10 +494,9 @@
       state.processedCards.add(card);
       if (cardHasRepostedText(card)) labelCard(card, "reposted");
     });
-    const flagged = document.querySelectorAll("[data-lj-reasons]").length;
-    sendBadgeCount(flagged);
   }
   function refilterAll() {
+    clearCardTextCache();
     const cards = getJobCards();
     cards.forEach((card) => {
       if (isSkippedCompany(card)) labelCard(card, "skippedCompany");
@@ -545,6 +549,7 @@
 
   // src/jobs/active.js
   function getActiveCard() {
+    clearCardTextCache();
     const cards = getJobCards();
     if (cards.length === 0) return null;
     const urlMatch = location.href.match(/currentJobId=(\d+)/);
@@ -1107,7 +1112,6 @@
       } else if (!onSearch) {
         const panel = document.getElementById("lj-filter-panel");
         if (panel) panel.remove();
-        sendBadgeCount(0);
       }
     }
     window.addEventListener("popstate", handleRouteChange);

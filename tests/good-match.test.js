@@ -18,24 +18,30 @@ function detectInTexts(texts) {
 describe("goodMatch detector", () => {
   // Verified live on real LinkedIn DOM — see PR description.
   it("fires on the HIGH tier message (Blossom example)", () => {
-    expect(detectInTexts([
-      "Your profile and resume match the required qualifications well.",
-      "Show match details",
-    ])).toBe(true);
+    expect(
+      detectInTexts([
+        "Your profile and resume match the required qualifications well.",
+        "Show match details",
+      ])
+    ).toBe(true);
   });
 
   it("does NOT fire on the LOW tier message (Middesk example)", () => {
-    expect(detectInTexts([
-      "Your profile and resume are missing some qualifications, add your experience or try exploring other jobs.",
-      "Show match details",
-      "Help me update my profile",
-    ])).toBe(false);
+    expect(
+      detectInTexts([
+        "Your profile and resume are missing some qualifications, add your experience or try exploring other jobs.",
+        "Show match details",
+        "Help me update my profile",
+      ])
+    ).toBe(false);
   });
 
   it("does NOT fire on a job description that happens to mention 'match' or 'qualifications'", () => {
-    expect(detectInTexts([
-      "We are looking for a candidate with strong qualifications. The role requires you to match deadlines and collaborate well across teams.",
-    ])).toBe(false);
+    expect(
+      detectInTexts([
+        "We are looking for a candidate with strong qualifications. The role requires you to match deadlines and collaborate well across teams.",
+      ])
+    ).toBe(false);
   });
 
   it("does NOT fire when the panel is still loading (only the H2 is present)", () => {
@@ -49,14 +55,16 @@ describe("goodMatch detector", () => {
   });
 
   it("is case-insensitive so casing tweaks don't break it", () => {
-    expect(detectInTexts([
-      "YOUR PROFILE AND RESUME MATCH THE REQUIRED QUALIFICATIONS WELL.",
-    ])).toBe(true);
+    expect(detectInTexts(["YOUR PROFILE AND RESUME MATCH THE REQUIRED QUALIFICATIONS WELL."])).toBe(
+      true
+    );
   });
 
   it("matches when the phrase appears mid-sentence (defensive)", () => {
-    expect(detectInTexts([
-      "We've reviewed your application; your profile and resume match the required qualifications well, congratulations.",
-    ])).toBe(true);
+    expect(
+      detectInTexts([
+        "We've reviewed your application; your profile and resume match the required qualifications well, congratulations.",
+      ])
+    ).toBe(true);
   });
 });

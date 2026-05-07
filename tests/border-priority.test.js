@@ -1,7 +1,15 @@
 import { describe, it, expect } from "vitest";
 
 // getBorderReason is defined inside content.js IIFE, so we extract the logic here.
-const BORDER_PRIORITY = ["noSponsor", "reposted", "skippedCompany", "skippedTitle", "applied", "unpaid", "goodMatch"];
+const BORDER_PRIORITY = [
+  "noSponsor",
+  "reposted",
+  "skippedCompany",
+  "skippedTitle",
+  "applied",
+  "unpaid",
+  "goodMatch",
+];
 
 function getBorderReason(reasons) {
   for (const r of BORDER_PRIORITY) {
@@ -22,7 +30,14 @@ describe("getBorderReason", () => {
   });
 
   it("follows full priority order", () => {
-    const allReasons = ["unpaid", "applied", "skippedTitle", "skippedCompany", "reposted", "noSponsor"];
+    const allReasons = [
+      "unpaid",
+      "applied",
+      "skippedTitle",
+      "skippedCompany",
+      "reposted",
+      "noSponsor",
+    ];
     expect(getBorderReason(allReasons)).toBe("noSponsor");
   });
 

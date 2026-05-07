@@ -116,12 +116,6 @@
         settings = s;
         cb(s);
       });
-    }, nudgeScroll = function() {
-      clearTimeout(nudgeTimer);
-      nudgeTimer = setTimeout(() => {
-        window.scrollBy(0, 1);
-        requestAnimationFrame(() => window.scrollBy(0, -1));
-      }, SCROLL_NUDGE_DELAY_MS);
     }, detectPostLabels = function(article) {
       const found = /* @__PURE__ */ new Set();
       for (const el of article.querySelectorAll("span, a, p")) {
@@ -555,8 +549,6 @@
     };
     "use strict";
     const MIN_FEED_IFRAME_WIDTH = 500;
-    const MAIN_POLL_INTERVAL_MS = 1500;
-    const MAIN_POLL_MAX_RETRIES = 20;
     const IFRAME_POLL_INTERVAL_MS = 1e3;
     const IFRAME_POLL_MAX_TICKS = 20;
     const SIDEBAR_POLL_INTERVAL_MS = 2e3;
@@ -565,13 +557,11 @@
     const UNFOLLOW_CHECK_INTERVAL_MS = 500;
     const UNFOLLOW_MAX_CHECKS = 20;
     const UNFOLLOW_COLLAPSE_DELAY_MS = 1200;
-    const SCROLL_NUDGE_DELAY_MS = 400;
     let initialized = false;
     let feedDoc = document;
     const DEFAULTS = SIFT_DEFAULTS;
     const SETTING_KEYS = /* @__PURE__ */ new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywords", "postAgeLimit", "hideProfileAnalytics"]);
     let settings = { ...DEFAULTS };
-    let nudgeTimer = null;
     const POST_TYPE_LABELS = /* @__PURE__ */ new Set([
       "Promoted",
       "Suggested",

@@ -20,12 +20,13 @@ import {
   getVisibleEl,
 } from "./dom.js";
 import { incrementStat, saveValue } from "./storage.js";
+import { addUnique, containsCi } from "../shared/lists.js";
 
 // ==================== Skip-list checks ====================
 export function isSkippedCompany(card) {
-  const name = getCompanyName(card).toLowerCase();
+  const name = getCompanyName(card);
   if (!name) return false;
-  return state.skippedCompanies.some((b) => name === b.toLowerCase());
+  return containsCi(state.skippedCompanies, name);
 }
 
 export function isSkippedTitle(card) {
@@ -191,8 +192,7 @@ export function refilterAll() {
 export function autoSkipCompany(card, triggerReason, { renderLists, showToast }) {
   const name = getCompanyName(card);
   if (!name) return;
-  if (state.skippedCompanies.some((c) => c.toLowerCase() === name.toLowerCase())) return;
-  state.skippedCompanies.push(name);
+  if (!addUnique(state.skippedCompanies, name)) return;
   saveValue("skippedCompanies", state.skippedCompanies);
   renderLists();
   refilterAll();

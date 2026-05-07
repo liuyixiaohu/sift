@@ -4,8 +4,13 @@ import { vi } from "vitest";
 globalThis.chrome = {
   storage: {
     local: {
-      get: vi.fn((_keys, cb) => { if (cb) cb({}); return Promise.resolve({}); }),
-      set: vi.fn((_data, cb) => { if (cb) cb(); }),
+      get: vi.fn((_keys, cb) => {
+        if (cb) cb({});
+        return Promise.resolve({});
+      }),
+      set: vi.fn((_data, cb) => {
+        if (cb) cb();
+      }),
     },
     onChanged: { addListener: vi.fn() },
   },

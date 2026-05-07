@@ -5,10 +5,7 @@
  * Special regex characters in keywords are escaped.
  */
 export function keywordsToRegex(keywords) {
-  return new RegExp(
-    keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"),
-    "i"
-  );
+  return new RegExp(keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "i");
 }
 
 /**
@@ -33,12 +30,20 @@ export function parsePostAgeDays(timeText) {
   if (!m) return 0;
   const n = parseInt(m[1], 10);
   switch (m[2]) {
-    case "m": return 0;          // minutes
-    case "h": return 0;          // hours (< 1 day)
-    case "d": return n;
-    case "w": return n * 7;
-    case "mo": return n * 30;
-    case "y": case "yr": return n * 365;
-    default: return 0;
+    case "m":
+      return 0; // minutes
+    case "h":
+      return 0; // hours (< 1 day)
+    case "d":
+      return n;
+    case "w":
+      return n * 7;
+    case "mo":
+      return n * 30;
+    case "y":
+    case "yr":
+      return n * 365;
+    default:
+      return 0;
   }
 }

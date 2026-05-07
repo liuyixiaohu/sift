@@ -56,13 +56,18 @@ Clean up LinkedIn: filter feed by keywords, hide ads & spam, mute or unfollow in
 ## Development
 
 ```bash
-npm install          # install esbuild + vitest
+npm install          # install esbuild, vitest, eslint, prettier
 npm run build        # bundle src/ → root JS files (IIFE)
 npm run watch        # rebuild on file changes
-npm test             # run 42 unit tests
+npm test             # run unit tests
+npm run lint         # ESLint over src/, tests/, build script
+npm run format       # apply Prettier
+npm run format:check # verify Prettier formatting (CI step)
 ```
 
 Source lives in `src/`, shared modules in `src/shared/`. esbuild bundles each entry point into a self-contained IIFE at the project root for Chrome to load.
+
+Every push and PR runs the same lint / format / test / build sequence in [GitHub Actions](.github/workflows/ci.yml) — including a guard that fails the build if `src/` changes weren't accompanied by a rebuilt bundle.
 
 ## Design
 

@@ -28,10 +28,7 @@
 
   // src/shared/matching.js
   function keywordsToRegex(keywords) {
-    return new RegExp(
-      keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"),
-      "i"
-    );
+    return new RegExp(keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "i");
   }
 
   // src/shared/badge.js

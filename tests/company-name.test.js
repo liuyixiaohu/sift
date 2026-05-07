@@ -26,75 +26,77 @@ describe("getCompanyName — anchored on dismiss-button title", () => {
 
   it("plain card: title once at line 0, company at line 1", () => {
     // Yuzu / Rilla / Acceler8 / Middesk / Stealth Startup / Grow Therapy all match this shape.
-    expect(getCompanyName(
-      ["Product Engineer", "Yuzu", "New York, NY (On-site)", "$140K/yr - $260K/yr"],
-      "Product Engineer"
-    )).toBe("Yuzu");
+    expect(
+      getCompanyName(
+        ["Product Engineer", "Yuzu", "New York, NY (On-site)", "$140K/yr - $260K/yr"],
+        "Product Engineer"
+      )
+    ).toBe("Yuzu");
   });
 
   it("Promoted card: LinkedIn renders the title twice; company is at line 2", () => {
     // Reproduces the user-reported bug. lastIndexOf skips past the duplicate
     // title; without it we'd return "Software Engineer (All Levels)".
-    expect(getCompanyName(
-      [
-        "Software Engineer (All Levels)",
-        "Software Engineer (All Levels)",
-        "Blossom",
-        "New York, NY (On-site)",
-      ],
-      "Software Engineer (All Levels)"
-    )).toBe("Blossom");
+    expect(
+      getCompanyName(
+        [
+          "Software Engineer (All Levels)",
+          "Software Engineer (All Levels)",
+          "Blossom",
+          "New York, NY (On-site)",
+        ],
+        "Software Engineer (All Levels)"
+      )
+    ).toBe("Blossom");
   });
 
   it("Verified card: line 0 is '<title> (Verified job)', line 1 is title, line 2 is company", () => {
-    expect(getCompanyName(
-      [
-        "Software Engineer - All Levels (Verified job)",
-        "Software Engineer - All Levels",
-        "GlossGenius",
-        "New York, NY",
-      ],
-      "Software Engineer - All Levels"
-    )).toBe("GlossGenius");
+    expect(
+      getCompanyName(
+        [
+          "Software Engineer - All Levels (Verified job)",
+          "Software Engineer - All Levels",
+          "GlossGenius",
+          "New York, NY",
+        ],
+        "Software Engineer - All Levels"
+      )
+    ).toBe("GlossGenius");
   });
 
   it("title containing parentheses isn't confused with the (Verified) suffix", () => {
-    expect(getCompanyName(
-      [
-        "Software Engineer - Full Stack (New York)",
-        "Software Engineer - Full Stack (New York)",
-        "Edra",
-        "New York, NY (On-site)",
-      ],
-      "Software Engineer - Full Stack (New York)"
-    )).toBe("Edra");
+    expect(
+      getCompanyName(
+        [
+          "Software Engineer - Full Stack (New York)",
+          "Software Engineer - Full Stack (New York)",
+          "Edra",
+          "New York, NY (On-site)",
+        ],
+        "Software Engineer - Full Stack (New York)"
+      )
+    ).toBe("Edra");
   });
 
   it("title with bracketed job code is anchored correctly", () => {
-    expect(getCompanyName(
-      [
-        "Software Engineer, Platform [33021]",
-        "Stealth Startup",
-        "New York, NY (On-site)",
-      ],
-      "Software Engineer, Platform [33021]"
-    )).toBe("Stealth Startup");
+    expect(
+      getCompanyName(
+        ["Software Engineer, Platform [33021]", "Stealth Startup", "New York, NY (On-site)"],
+        "Software Engineer, Platform [33021]"
+      )
+    ).toBe("Stealth Startup");
   });
 
   // Fallback path — when dismiss-button parsing fails (locale, format change, etc.)
   describe("fallback heuristic (no dismiss title)", () => {
     it("uses the (Verified prefix path on the legacy verified shape", () => {
-      expect(getCompanyName(
-        ["(Verified) Acme Corp", "Senior Engineer", "Acme Corp", "SF"],
-        ""
-      )).toBe("Acme Corp");
+      expect(
+        getCompanyName(["(Verified) Acme Corp", "Senior Engineer", "Acme Corp", "SF"], "")
+      ).toBe("Acme Corp");
     });
 
     it("returns lines[1] for plain cards", () => {
-      expect(getCompanyName(
-        ["Senior Engineer", "Acme Corp", "SF"],
-        ""
-      )).toBe("Acme Corp");
+      expect(getCompanyName(["Senior Engineer", "Acme Corp", "SF"], "")).toBe("Acme Corp");
     });
 
     it("returns lines[1] when only two lines are present", () => {
@@ -116,10 +118,9 @@ describe("getCompanyName — anchored on dismiss-button title", () => {
     it("falls through to the heuristic when title isn't found in lines", () => {
       // Simulates a future LinkedIn change where dismiss aria-label diverges
       // from what's rendered in the card. Heuristic still returns lines[1].
-      expect(getCompanyName(
-        ["Different Title", "Acme Corp", "SF"],
-        "Senior Engineer"
-      )).toBe("Acme Corp");
+      expect(getCompanyName(["Different Title", "Acme Corp", "SF"], "Senior Engineer")).toBe(
+        "Acme Corp"
+      );
     });
   });
 });

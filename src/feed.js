@@ -9,8 +9,6 @@ if (chrome.runtime?.id) {
 
   // === Tuning constants ===
   const MIN_FEED_IFRAME_WIDTH = 500;  // px — ignore narrow iframes (ads, widgets)
-  const MAIN_POLL_INTERVAL_MS = 1500; // poll interval when waiting for <main>
-  const MAIN_POLL_MAX_RETRIES = 20;   // max retries before giving up on <main>
   const IFRAME_POLL_INTERVAL_MS = 1000;
   const IFRAME_POLL_MAX_TICKS = 20;
   const SIDEBAR_POLL_INTERVAL_MS = 2000;
@@ -19,7 +17,6 @@ if (chrome.runtime?.id) {
   const UNFOLLOW_CHECK_INTERVAL_MS = 500;
   const UNFOLLOW_MAX_CHECKS = 20;
   const UNFOLLOW_COLLAPSE_DELAY_MS = 1200;
-  const SCROLL_NUDGE_DELAY_MS = 400;
 
   function isFeedPage() {
     const p = location.pathname;
@@ -65,15 +62,6 @@ if (chrome.runtime?.id) {
   }
 
   // === Scroll nudge: trigger LinkedIn's infinite scroll to fill gaps ===
-  let nudgeTimer = null;
-  function nudgeScroll() {
-    clearTimeout(nudgeTimer);
-    nudgeTimer = setTimeout(() => {
-      window.scrollBy(0, 1);
-      requestAnimationFrame(() => window.scrollBy(0, -1));
-    }, SCROLL_NUDGE_DELAY_MS);
-  }
-
   // === Filtering logic ===
 
   const POST_TYPE_LABELS = new Set([

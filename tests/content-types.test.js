@@ -39,8 +39,13 @@ describe("Poll detection regex", () => {
 
 // Celebration detection patterns — same list used in src/feed.js
 const CELEBRATION_PATTERNS = [
-  "job update", "started a new position", "work anniversary",
-  "celebrating", "new role", "promoted to", "birthday",
+  "job update",
+  "started a new position",
+  "work anniversary",
+  "celebrating",
+  "new role",
+  "promoted to",
+  "birthday",
 ];
 
 function matchesCelebration(text) {

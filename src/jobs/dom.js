@@ -132,11 +132,26 @@ export function getCompanyName(card) {
 
 // Filter out injected badge text to avoid interfering with title/company detection.
 const BADGE_TEXTS = new Set(Object.values(BADGE_DISPLAY));
+
+// Per-tick memo for getCardTextLines. innerText forces a layout, and a single
+// filterJobCards / getActiveCard pass invokes getJobTitle + getCompanyName per
+// card (often via getJobKey too) — without this cache that's ~3 innerText reads
+// per card per tick. Callers that start a new tick (filterJobCards, refilterAll,
+// getActiveCard, refreshBadges, scan loop) call clearCardTextCache() first.
+let cardTextLinesCache = new WeakMap();
+
+export function clearCardTextCache() {
+  cardTextLinesCache = new WeakMap();
+}
+
 export function getCardTextLines(card) {
-  return card.innerText
+  if (cardTextLinesCache.has(card)) return cardTextLinesCache.get(card);
+  const lines = card.innerText
     .split("\n")
     .map((l) => l.trim())
     .filter((l) => l && l !== "·" && !BADGE_TEXTS.has(l));
+  cardTextLinesCache.set(card, lines);
+  return lines;
 }
 
 // ==================== Card Text Detectors ====================

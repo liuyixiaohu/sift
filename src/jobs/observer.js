@@ -6,7 +6,6 @@ import { isSearchPage, state } from "./state.js";
 import { filterJobCards, refreshBadges } from "./labels.js";
 import { checkDetailPanel } from "./active.js";
 import { updateScanButton } from "./scan.js";
-import { sendBadgeCount } from "../shared/badge.js";
 
 const URL_POLL_INTERVAL_MS = 1000; // belt-and-suspenders fallback for Navigation API
 const ROUTE_INIT_DELAY_MS = 2000;
@@ -39,7 +38,6 @@ export function attachRouteHandlers({ init, renderLists }) {
     } else if (!onSearch) {
       const panel = document.getElementById("lj-filter-panel");
       if (panel) panel.remove();
-      sendBadgeCount(0);
     }
   }
 

@@ -4,6 +4,7 @@
 import { BADGE_DISPLAY } from "./constants.js";
 import { state } from "./state.js";
 import {
+  clearCardTextCache,
   detailHasGoodMatch,
   detailHasNoSponsorship,
   detailHasUnpaid,
@@ -19,6 +20,9 @@ import { showToast } from "./toast.js";
 
 // ==================== Get Currently Active Card ====================
 export function getActiveCard() {
+  // New tick — invalidate the per-tick cache before the per-card title scan
+  // below so a card whose title just changed isn't matched against stale text.
+  clearCardTextCache();
   const cards = getJobCards();
   if (cards.length === 0) return null;
 

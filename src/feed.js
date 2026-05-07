@@ -1,6 +1,5 @@
 import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
 import { matchesFeedKeyword, parsePostAgeDays } from "./shared/matching.js";
-import { sendBadgeCount } from "./shared/badge.js";
 
 if (chrome.runtime?.id) {
   "use strict";
@@ -409,8 +408,6 @@ if (chrome.runtime?.id) {
     // Also update breakdown if visible
     const tip = feedDoc.getElementById("lj-badge-tip");
     if (tip && tip.classList.contains("visible")) updateBreakdown();
-    // Update extension icon badge
-    sendBadgeCount(count);
   }
 
   // === Profile page: apply sidebar + analytics body classes ===
@@ -680,10 +677,12 @@ if (chrome.runtime?.id) {
     } else {
       initialized = false;
       feedDoc = document;
-      sendBadgeCount(0);
       if (sidebarInterval) clearInterval(sidebarInterval);
       if (iframeCheckInterval) clearInterval(iframeCheckInterval);
-      if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+      if (scanInterval) {
+        clearInterval(scanInterval);
+        scanInterval = null;
+      }
     }
   }
 

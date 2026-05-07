@@ -11,6 +11,7 @@ import { state } from "./state.js";
 import {
   cardHasAppliedText,
   cardHasRepostedText,
+  clearCardTextCache,
   getCompanyName,
   getJobCards,
   getJobKey,
@@ -19,7 +20,6 @@ import {
   getVisibleEl,
 } from "./dom.js";
 import { incrementStat, saveValue } from "./storage.js";
-import { sendBadgeCount } from "../shared/badge.js";
 
 // ==================== Skip-list checks ====================
 export function isSkippedCompany(card) {
@@ -122,6 +122,9 @@ export function applyBadges(card) {
 
 // Restore badges that LinkedIn DOM-replaced.
 export function refreshBadges() {
+  // Reset per-tick text cache: getJobKey below calls getJobTitle/getCompanyName,
+  // and we want those to reflect any DOM replacement that triggered this pass.
+  clearCardTextCache();
   // 1. data attribute present but badge DOM missing → re-insert.
   document.querySelectorAll("[data-lj-reasons]").forEach((card) => {
     const badgeTarget = getLastVisibleEl(card);
@@ -149,6 +152,9 @@ export function refreshBadges() {
 
 // ==================== Filtering passes ====================
 export function filterJobCards() {
+  // Reset the per-tick getCardTextLines cache so any DOM changes since the
+  // last pass are picked up; cache hits within this tick avoid repeat innerText reads.
+  clearCardTextCache();
   const cards = getJobCards();
   cards.forEach((card) => {
     // These checks bypass processedCards — text may render late or settings may change.
@@ -167,13 +173,10 @@ export function filterJobCards() {
 
     if (cardHasRepostedText(card)) labelCard(card, "reposted");
   });
-
-  // Update extension icon badge with flagged count (currently a no-op stub in shared/badge.js).
-  const flagged = document.querySelectorAll("[data-lj-reasons]").length;
-  sendBadgeCount(flagged);
 }
 
 export function refilterAll() {
+  clearCardTextCache();
   const cards = getJobCards();
   cards.forEach((card) => {
     if (isSkippedCompany(card)) labelCard(card, "skippedCompany");

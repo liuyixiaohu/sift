@@ -1,22 +1,5 @@
 import { describe, it, expect } from "vitest";
-
-// getBorderReason is defined inside content.js IIFE, so we extract the logic here.
-const BORDER_PRIORITY = [
-  "noSponsor",
-  "reposted",
-  "skippedCompany",
-  "skippedTitle",
-  "applied",
-  "unpaid",
-  "goodMatch",
-];
-
-function getBorderReason(reasons) {
-  for (const r of BORDER_PRIORITY) {
-    if (reasons.includes(r)) return r;
-  }
-  return reasons[0];
-}
+import { getBorderReason } from "../src/jobs/constants.js";
 
 describe("getBorderReason", () => {
   it("returns highest priority reason", () => {

@@ -144,17 +144,23 @@
       const id = getCardJobId(card);
       if (id) return "id:" + id;
       return getJobTitle(card) + "|" + getCompanyName(card);
+    }, titleFromDismissButton = function(card) {
+      const btn = card.querySelector('button[aria-label*="Dismiss"]');
+      if (!btn) return "";
+      const m = (btn.getAttribute("aria-label") || "").match(/^Dismiss\s+(.+?)\s+job$/);
+      return m ? m[1] : "";
     }, getJobTitle = function(card) {
-      const dismiss = card.querySelector('button[aria-label*="Dismiss"]');
-      if (dismiss) {
-        const label = dismiss.getAttribute("aria-label") || "";
-        const match = label.match(/^Dismiss\s+(.+?)\s+job$/);
-        if (match) return match[1];
-      }
+      const fromDismiss = titleFromDismissButton(card);
+      if (fromDismiss) return fromDismiss;
       const lines = getCardTextLines(card);
       return lines[1] || lines[0] || "";
     }, getCompanyName = function(card) {
       const lines = getCardTextLines(card);
+      const title = titleFromDismissButton(card);
+      if (title) {
+        const idx = lines.lastIndexOf(title);
+        if (idx >= 0 && idx + 1 < lines.length) return lines[idx + 1];
+      }
       if (lines.length >= 3) {
         if (lines[0].includes("(Verified")) return lines[2] || "";
         return lines[1] || "";

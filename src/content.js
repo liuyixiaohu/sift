@@ -253,21 +253,39 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
     return getJobTitle(card) + "|" + getCompanyName(card);
   }
 
+  // Pull the title out of the dismiss button's aria-label ("Dismiss <title> job").
+  // Most reliable signal in a job card — used as an anchor by both the title
+  // and company extractors below. Returns "" if not found (non-English locale,
+  // changed format, etc.) so callers can fall back to a heuristic.
+  function titleFromDismissButton(card) {
+    const btn = card.querySelector('button[aria-label*="Dismiss"]');
+    if (!btn) return "";
+    const m = (btn.getAttribute("aria-label") || "").match(/^Dismiss\s+(.+?)\s+job$/);
+    return m ? m[1] : "";
+  }
+
   // ==================== Extract Job Title from Card ====================
   function getJobTitle(card) {
-    const dismiss = card.querySelector('button[aria-label*="Dismiss"]');
-    if (dismiss) {
-      const label = dismiss.getAttribute("aria-label") || "";
-      const match = label.match(/^Dismiss\s+(.+?)\s+job$/);
-      if (match) return match[1];
-    }
+    const fromDismiss = titleFromDismissButton(card);
+    if (fromDismiss) return fromDismiss;
     const lines = getCardTextLines(card);
     return lines[1] || lines[0] || "";
   }
 
   // ==================== Extract Company Name from Card ====================
+  // Anchors on the dismiss-button title and returns the line right after it.
+  // Uses lastIndexOf because LinkedIn renders the title twice in card.innerText
+  // for Promoted / sponsored listings (a screen-reader span + the visible link),
+  // so the company is on the line after the *last* title occurrence — not after
+  // the first. Falls back to a legacy line-index heuristic when the dismiss
+  // button isn't parseable (e.g. non-English locales).
   function getCompanyName(card) {
     const lines = getCardTextLines(card);
+    const title = titleFromDismissButton(card);
+    if (title) {
+      const idx = lines.lastIndexOf(title);
+      if (idx >= 0 && idx + 1 < lines.length) return lines[idx + 1];
+    }
     if (lines.length >= 3) {
       if (lines[0].includes("(Verified")) return lines[2] || "";
       return lines[1] || "";

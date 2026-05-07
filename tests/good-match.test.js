@@ -1,13 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { GOOD_MATCH_RE } from "../src/jobs/constants.js";
 
-// Pure-logic replica of the goodMatch detector regex from src/content.js.
-// The detector returns true only when LinkedIn Premium's "Assessing your job
-// match" panel announces the HIGH tier — not the LOW tier.
-const GOOD_MATCH_RE = /match the required qualifications well/i;
-
+// Mirrors the production detector's per-paragraph scan: filters strings that
+// are too short (e.g. "Show match details" sibling) before testing the regex.
+// The full detector lives in src/jobs/dom.js#detailHasGoodMatch and uses real
+// DOM querySelectorAll — these tests cover the regex + length-filter logic.
 function detectInTexts(texts) {
-  // Filters short strings (e.g. "Show match details" sibling) so the test mirrors
-  // the production detector's `t.length < 30` early-skip.
   for (const t of texts) {
     if (t.length < 30) continue;
     if (GOOD_MATCH_RE.test(t)) return true;

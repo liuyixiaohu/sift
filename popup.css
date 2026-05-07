@@ -365,6 +365,27 @@ body {
   gap: 12px;
 }
 
+.data-storage-usage {
+  font-size: 11px;
+  color: #5A636B;
+  background: rgba(243, 239, 231, 0.6);
+  padding: 8px 12px;
+  border-radius: 6px;
+  border-left: 3px solid #5a8a6e;
+  font-variant-numeric: tabular-nums;
+}
+
+.data-storage-usage[data-level="warn"] {
+  border-left-color: #c9974a;
+  color: #1F2328;
+}
+
+.data-storage-usage[data-level="block"] {
+  border-left-color: #D9797B;
+  color: #1F2328;
+  font-weight: 600;
+}
+
 .data-btn {
   width: 100%;
   padding: 12px;

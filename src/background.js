@@ -1,6 +1,7 @@
 // Sift — background service worker
 
 import { SIFT_DEFAULTS } from "./shared/defaults.js";
+import { migrate, SCHEMA_VERSION } from "./shared/schema.js";
 
 // === Context menu: "Mute keyword" ===
 
@@ -10,6 +11,16 @@ chrome.runtime.onInstalled.addListener(() => {
     title: 'Mute "%s" in feed',
     contexts: ["selection"],
     documentUrlPatterns: ["https://www.linkedin.com/*"],
+  });
+
+  // Stamp / migrate the schema version on install + on every update so old
+  // installs don't have to wait for the popup to open before their stored
+  // data is brought up to the current schema. Idempotent.
+  chrome.storage.local.get(null, (data) => {
+    const before = typeof data.schemaVersion === "number" ? data.schemaVersion : 0;
+    if (before >= SCHEMA_VERSION) return;
+    const migrated = migrate({ ...data });
+    chrome.storage.local.set(migrated);
   });
 });
 

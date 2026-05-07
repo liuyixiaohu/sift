@@ -1,6 +1,9 @@
 // Sift — shared default settings (single source of truth)
 
 export const SIFT_DEFAULTS = {
+  // Storage schema version — bumped via src/shared/schema.js#migrate when
+  // the shape of stored data changes. New installs start at the latest.
+  schemaVersion: 1,
   // Feed page
   hidePromoted: true,
   hideSuggested: true,

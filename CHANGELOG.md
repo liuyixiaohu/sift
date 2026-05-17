@@ -1,5 +1,36 @@
 # Changelog
 
+## v2.18
+
+A correctness-and-honesty pass driven by an independent code-review round. Five merged PRs (#48–#52). User-visible changes are small; under the hood, the diagnostic panel is now trustworthy and Pause actually means "all filtering suspended."
+
+### New
+- **Smart diagnostic warnings.** The popup's "On this page" strip now shows an amber ⚠ chip when a filter toggle is ON but Sift matched zero elements on the relevant page type. That's the early signal that LinkedIn changed a class — without it, the recovery loop relied on user bug reports filed weeks after the fact.
+- **Invalid-regex chip (distinct from the "DOM changed" warn).** When the user is on regex match mode and one of their keywords doesn't compile, the panel renders `⚠ N Invalid regex` in olive instead of falsely accusing LinkedIn. Bad regex is also rejected at popup add-time with a specific toast.
+
+### Fixed
+- **Pause now actually pauses everything.** Previously the master toggle suspended dim/hide on jobs cards but left badges, colored borders, the `jobsFlagged` stats counter, and `autoSkipDetected` running — so paused users' skip lists silently kept growing. Pause now short-circuits `labelCard`, strips existing badges, and ignores auto-skip until unpaused.
+- **Diagnostic panel uses fresh settings on each refresh.** Toggling Hide Ads off then clicking ↻ previously still showed a warn chip because the panel cached the old toggle state at popup-open time. The ↻ button now re-reads storage every click.
+- **Jobs init failures surface to the user.** If `chrome.storage.local.get` rejects during boot, the jobs page no longer silently falls back to vanilla LinkedIn — a toast says "Sift failed to load on this page — check the console."
+- **`chrome.storage.local.set` failures no longer report success.** Import, Reset Stats, and Reset All Data callbacks now check `chrome.runtime.lastError` and surface the actual error to the user instead of cheerfully claiming success while storage stayed unchanged.
+- **Stats no longer lose increments on transient storage errors.** `flushStats` re-queues the in-flight batch back into `pendingStats` if the chrome.storage write fails, instead of zeroing them silently.
+- **`hideProfileSuggestions` works inside LinkedIn's iframe-mode cohort.** `markProfileNoise` now scopes its scan to `feedDoc` (the iframe document where applicable) instead of the top-frame `document` — previously the body class went on the iframe body but the markers landed in the top frame, so nothing matched.
+- **Schema validation rejects invalid `feedKeywordMatchMode` values on import.** `"REGEX"` / `"fuzzy"` / `""` no longer slip past validation (they used to silently degrade to substring at runtime).
+- **`wholeWord` mode delegates to the existing `matchesWholeWord` helper.** Old bespoke `\b`-with-substring-fallback path would have wrongly matched `"abc++d"` against the keyword `"++"` (the fallback dropped the boundary check). New path uses `(?<!\w)…(?!\w)` lookbehind/lookahead, correct for both alphanumeric and symbol keywords.
+- **`chrome.runtime.lastError` no longer collapses every diagnostic-fetch failure to "Reload the LinkedIn tab."** Three distinct user-facing messages map to three distinct root causes (no content script → reload; sendMessage error → console; content-script threw → diag.error).
+- **Undo on Skip Current Company surfaces failures instead of lying.** If the undo callback throws (e.g. memory pop succeeded but the storage write rejected), the toast now re-toasts "Undo failed — your skip list may be out of sync" instead of silently dismissing.
+
+### Internal
+- **`tests/fixtures/*.html` calibrated against real LinkedIn DOM** (captured via browser MCP in 2026-05). Previously the fixtures were structural approximations of what `feed.js` expected; now they reflect what LinkedIn actually serves. The same selector tests still pass, but a future LinkedIn change will fail a specific test instead of going unnoticed.
+- **`collectDiagnostics` wrapped in try/catch.** Stale iframe documents could throw on `querySelectorAll`; previously this left the popup stuck on "Loading…" and the user concluded the extension was broken. Now the listener responds with `{error: ...}` and the popup renders a specific error.
+- **Schema bumped to enforce enum constraints (new `SCHEMA_ENUMS` map).** Import validation now checks `feedKeywordMatchMode` against the allowed set instead of trusting the type-check alone.
+- **`estimateBytes` returns `Infinity` on JSON serialization failure** (was `0`). Pre-flight quota check now correctly refuses an unmeasurable import instead of letting it pass with a 0-byte estimate.
+- **`SETTING_KEYS` moved to `src/shared/setting-keys.js`.** Was duplicated across `feed.js` and `content.js` as independently-drifting lists. Single file with two clearly-named exports.
+- **`markProfileNoise` skips `<main>` on feed pages.** Feed `<main>` has hundreds of `<p>` leaves per post; the widgets we need to mark live in the right-rail aside. Conditional scope shortens the hot-path scan tick.
+- **107 → 167 tests** across the whole batch (#43–#52). New coverage: smart-warning severity classification, invalid-regex paths, schema enum validation, real-DOM selector smoke tests, `validateKeywords` edge cases, `estimateBytes` fail-safe.
+
+---
+
 ## v2.17
 
 A polish-and-resilience batch. Four merged PRs (#43–#46).

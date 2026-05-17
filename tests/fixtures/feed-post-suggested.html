@@ -1,0 +1,25 @@
+<!--
+  Feed post fixture — "Suggested" post (LinkedIn recommends to follow).
+
+  Same structural pattern as the Promoted fixture but with "Suggested"
+  as the leaf label. Used to verify our type-label detection handles each
+  of POST_TYPE_LABELS, not just Promoted.
+-->
+<!doctype html>
+<html lang="en">
+  <body>
+    <main role="main">
+      <div role="list">
+        <div data-display-contents>
+          <article>
+            <header>
+              <a href="/in/example-user/"><span>Example User</span></a>
+              <span>Suggested</span>
+            </header>
+            <p>This is a suggested post body.</p>
+          </article>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

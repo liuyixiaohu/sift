@@ -92,16 +92,16 @@
         }
       }
       push("Too old", diag.feed.tooOld, (settings.postAgeLimit || 0) > 0, true);
-      push("Sidebar widgets", diag.profile.noise, !!settings.hideProfileSuggestions, true);
+      push("Suggestions & ads", diag.profile.noise, !!settings.hideProfileSuggestions, true);
     } else if (diag.pageType === "profile") {
       push("Analytics", diag.profile.analytics, !!settings.hideProfileAnalytics, true);
-      push("Suggestion widgets", diag.profile.noise, !!settings.hideProfileSuggestions, true);
+      push("Suggestions & ads", diag.profile.noise, !!settings.hideProfileSuggestions, true);
     } else if (diag.pageType === "jobs") {
       if (diag.jobs.flagged > 0) {
         items.push({ label: "Flagged jobs", n: diag.jobs.flagged, severity: "ok" });
       }
     } else if (diag.pageType === "network") {
-      push("Hidden widgets", diag.profile.noise, !!settings.hideProfileSuggestions, true);
+      push("Suggestions & ads", diag.profile.noise, !!settings.hideProfileSuggestions, true);
     }
     return items;
   }
@@ -130,6 +130,7 @@
   }
 
   // src/shared/matching.js
+  var FEED_KEYWORD_MATCH_MODES = ["wholeWord", "substring", "regex"];
   function validateKeywords(keywords, mode) {
     const out = { valid: [], invalid: [] };
     if (!Array.isArray(keywords)) return out;
@@ -187,6 +188,9 @@
     stats: "object",
     statsAllTime: "object"
   };
+  var SCHEMA_ENUMS = {
+    feedKeywordMatchMode: ["wholeWord", "substring", "regex"]
+  };
   function checkType(value, expected) {
     switch (expected) {
       case "boolean":
@@ -210,6 +214,13 @@
       if (!(key in data)) continue;
       if (!checkType(data[key], expected)) {
         errors.push(`"${key}" should be ${humanType(expected)}, got ${humanActual(data[key])}.`);
+        continue;
+      }
+      const allowed = SCHEMA_ENUMS[key];
+      if (allowed && !allowed.includes(data[key])) {
+        errors.push(
+          `"${key}" should be one of [${allowed.map((v) => `"${v}"`).join(", ")}], got "${data[key]}".`
+        );
       }
     }
     const MAX_LIST_LEN = 1e5;
@@ -249,7 +260,7 @@
     try {
       return new Blob([JSON.stringify(data)]).size;
     } catch {
-      return 0;
+      return Infinity;
     }
   }
   function formatBytes(bytes) {
@@ -441,7 +452,8 @@
       network: "Network",
       other: "Other"
     };
-    function buildDiagnosticPanel(container, settings) {
+    function buildDiagnosticPanel(container, initialSettings) {
+      const settingKeyDefaults = initialSettings;
       const wrap = document.createElement("div");
       wrap.className = "diag-panel";
       wrap.dataset.state = "loading";
@@ -469,7 +481,7 @@
         msg.textContent = text;
         body.appendChild(msg);
       }
-      function renderDiag(diag) {
+      function renderDiag(diag, currentSettings) {
         wrap.dataset.state = "ok";
         wrap.dataset.paused = diag.paused ? "true" : "false";
         body.innerHTML = "";
@@ -477,7 +489,7 @@
         pill.className = "diag-page";
         pill.textContent = DIAG_PAGE_LABELS[diag.pageType] || diag.pageType;
         body.appendChild(pill);
-        const items = relevantCountsFor(diag, settings);
+        const items = relevantCountsFor(diag, currentSettings);
         if (items.length === 0) {
           const none = document.createElement("span");
           none.className = "diag-message";
@@ -513,35 +525,44 @@
       }
       function refresh() {
         renderMessage("loading", "Loading\u2026");
-        chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
-          const tab = tabs && tabs[0];
-          if (!tab || !tab.url || !tab.url.includes("linkedin.com")) {
-            renderMessage("empty", "Open LinkedIn to see what Sift detects");
-            return;
+        chrome.storage.local.get(settingKeyDefaults, function(currentSettings) {
+          if (chrome.runtime.lastError) {
+            console.warn(
+              "[Sift] diag settings read failed:",
+              chrome.runtime.lastError.message
+            );
+            currentSettings = settingKeyDefaults;
           }
-          chrome.tabs.sendMessage(tab.id, { type: "SIFT_DIAG" }, function(diag) {
-            const err = chrome.runtime.lastError;
-            if (err) {
-              const msg = err.message || "";
-              if (msg.indexOf("Could not establish connection") !== -1) {
-                renderMessage("error", "Reload the LinkedIn tab to see diagnostics");
-              } else {
-                console.warn("[Sift] diag sendMessage error:", msg);
-                renderMessage("error", "Diagnostics unavailable \u2014 check the console");
+          chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+            const tab = tabs && tabs[0];
+            if (!tab || !tab.url || !tab.url.includes("linkedin.com")) {
+              renderMessage("empty", "Open LinkedIn to see what Sift detects");
+              return;
+            }
+            chrome.tabs.sendMessage(tab.id, { type: "SIFT_DIAG" }, function(diag) {
+              const err = chrome.runtime.lastError;
+              if (err) {
+                const msg = err.message || "";
+                if (msg.indexOf("Could not establish connection") !== -1) {
+                  renderMessage("error", "Reload the LinkedIn tab to see diagnostics");
+                } else {
+                  console.warn("[Sift] diag sendMessage error:", msg);
+                  renderMessage("error", "Diagnostics unavailable \u2014 check the console");
+                }
+                return;
               }
-              return;
-            }
-            if (!diag) {
-              console.warn("[Sift] diag response was empty");
-              renderMessage("error", "Diagnostics unavailable \u2014 check the console");
-              return;
-            }
-            if (diag.error) {
-              console.warn("[Sift] content-script diag threw:", diag.error);
-              renderMessage("error", "Diagnostics error: " + diag.error);
-              return;
-            }
-            renderDiag(diag);
+              if (!diag) {
+                console.warn("[Sift] diag response was empty");
+                renderMessage("error", "Diagnostics unavailable \u2014 check the console");
+                return;
+              }
+              if (diag.error) {
+                console.warn("[Sift] content-script diag threw:", diag.error);
+                renderMessage("error", "Diagnostics error: " + diag.error);
+                return;
+              }
+              renderDiag(diag, currentSettings);
+            });
           });
         });
       }
@@ -640,6 +661,11 @@
           chrome.storage.local.set({ feedKeywordFilterEnabled: v });
         })
       );
+      const MATCH_MODE_LABELS = {
+        wholeWord: "Whole word",
+        substring: "Substring",
+        regex: "Regex"
+      };
       let kwModeRow = document.createElement("div");
       kwModeRow.className = "toggle-row";
       let kwModeLabel = document.createElement("span");
@@ -648,15 +674,11 @@
       let kwModeSelect = document.createElement("select");
       kwModeSelect.className = "age-select";
       kwModeSelect.title = "Whole word: matches whole words only (avoids 'ai' matching 'training').\nSubstring: matches any text (legacy default).\nRegex: each keyword is a regex pattern.";
-      [
-        { value: "wholeWord", label: "Whole word" },
-        { value: "substring", label: "Substring" },
-        { value: "regex", label: "Regex" }
-      ].forEach(function(opt) {
+      FEED_KEYWORD_MATCH_MODES.forEach(function(value) {
         let option = document.createElement("option");
-        option.value = opt.value;
-        option.textContent = opt.label;
-        if ((settings.feedKeywordMatchMode || "substring") === opt.value) {
+        option.value = value;
+        option.textContent = MATCH_MODE_LABELS[value] || value;
+        if ((settings.feedKeywordMatchMode || "substring") === value) {
           option.selected = true;
         }
         kwModeSelect.appendChild(option);
@@ -677,9 +699,8 @@
         if (e.key === "Enter") addFeedKeywords();
       });
       let kwAddBtn = document.createElement("button");
-      kwAddBtn.className = "list-item-remove";
+      kwAddBtn.className = "list-add-btn";
       kwAddBtn.textContent = "+";
-      kwAddBtn.style.cssText = "font-size:16px;cursor:pointer;background:none;border:none;color:#D9797B;font-weight:bold;";
       kwAddBtn.addEventListener("click", addFeedKeywords);
       kwAddRow.appendChild(kwInput);
       kwAddRow.appendChild(kwAddBtn);
@@ -807,9 +828,8 @@
       companyAddInput.placeholder = "Add companies (comma-separated)\u2026";
       companyAddInput.className = "list-search-input";
       let companyAddBtn = document.createElement("button");
-      companyAddBtn.className = "list-item-remove";
+      companyAddBtn.className = "list-add-btn";
       companyAddBtn.textContent = "+";
-      companyAddBtn.style.cssText = "font-size:16px;cursor:pointer;background:none;border:none;color:#D9797B;font-weight:bold;";
       companyAddRow.appendChild(companyAddInput);
       companyAddRow.appendChild(companyAddBtn);
       jobsLists.appendChild(companyAddRow);
@@ -841,9 +861,8 @@
       titleAddInput.placeholder = "Add title keywords (comma-separated)\u2026";
       titleAddInput.className = "list-search-input";
       let titleAddBtn = document.createElement("button");
-      titleAddBtn.className = "list-item-remove";
+      titleAddBtn.className = "list-add-btn";
       titleAddBtn.textContent = "+";
-      titleAddBtn.style.cssText = "font-size:16px;cursor:pointer;background:none;border:none;color:#D9797B;font-weight:bold;";
       titleAddRow.appendChild(titleAddInput);
       titleAddRow.appendChild(titleAddBtn);
       jobsLists.appendChild(titleAddRow);

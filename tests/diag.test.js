@@ -77,8 +77,8 @@ describe("relevantCountsFor", () => {
         n: 1,
         severity: "ok",
       });
-      expect(items.find((i) => i.label === "Suggestion widgets")).toEqual({
-        label: "Suggestion widgets",
+      expect(items.find((i) => i.label === "Suggestions & ads")).toEqual({
+        label: "Suggestions & ads",
         n: 4,
         severity: "ok",
       });
@@ -105,7 +105,7 @@ describe("relevantCountsFor", () => {
       expect(warnLabels).toContain("Celebrations");
       expect(warnLabels).toContain("Keywords");
       expect(warnLabels).toContain("Too old");
-      expect(warnLabels).toContain("Sidebar widgets");
+      expect(warnLabels).toContain("Suggestions & ads");
     });
 
     it("warns for Hide Analytics on a profile page with zero matches", () => {

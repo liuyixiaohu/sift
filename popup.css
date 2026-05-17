@@ -426,6 +426,26 @@ body {
   opacity: 1;
 }
 
+/* "+" add button next to list inputs. Distinct class from list-item-remove
+ * because (a) it's an ADD not a remove, (b) it's full-weight (no opacity
+ * fade) since adding is a more prominent action. */
+.list-add-btn {
+  background: none;
+  border: none;
+  color: #D9797B;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  padding: 0 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  transition: opacity 0.2s;
+}
+
+.list-add-btn:hover {
+  opacity: 0.7;
+}
+
 .list-toggle-btn {
   background: none;
   border: none;

@@ -82,11 +82,14 @@ export function relevantCountsFor(diag, settings) {
       }
     }
     push("Too old", diag.feed.tooOld, (settings.postAgeLimit || 0) > 0, true);
-    // hideProfileSuggestions also covers feed-page sidebar widgets (News etc.)
-    push("Sidebar widgets", diag.profile.noise, !!settings.hideProfileSuggestions, true);
+    // Same label as the toggle in popup.js ("Hide suggestions & ads")
+    // so the chip and the setting line up visually. Covers feed-page
+    // sidebar widgets (News / puzzles / ads) here, profile-page widgets
+    // (Suggested for you / People you may know / ads) on the profile branch.
+    push("Suggestions & ads", diag.profile.noise, !!settings.hideProfileSuggestions, true);
   } else if (diag.pageType === "profile") {
     push("Analytics", diag.profile.analytics, !!settings.hideProfileAnalytics, true);
-    push("Suggestion widgets", diag.profile.noise, !!settings.hideProfileSuggestions, true);
+    push("Suggestions & ads", diag.profile.noise, !!settings.hideProfileSuggestions, true);
   } else if (diag.pageType === "jobs") {
     // Jobs uses a multi-label `data-lj-reasons` so we can't cleanly attribute
     // a zero-count back to a specific toggle. Show the aggregate when there
@@ -98,7 +101,7 @@ export function relevantCountsFor(diag, settings) {
     // Network page only uses hidePromoted (the game-promo CSS rule) but has
     // no marker count for it. Surface the same "noise" count under
     // hideProfileSuggestions as a proxy — same widget-marker mechanism.
-    push("Hidden widgets", diag.profile.noise, !!settings.hideProfileSuggestions, true);
+    push("Suggestions & ads", diag.profile.noise, !!settings.hideProfileSuggestions, true);
   }
 
   return items;

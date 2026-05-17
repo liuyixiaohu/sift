@@ -13,6 +13,7 @@ import {
 } from "./jobs/observer.js";
 import { saveValue } from "./jobs/storage.js";
 import { showToast } from "./jobs/toast.js";
+import { JOBS_PAGE_SETTING_KEYS } from "./shared/setting-keys.js";
 
 if (chrome.runtime?.id && !window.__ljContentLoaded) {
   window.__ljContentLoaded = true;
@@ -59,19 +60,11 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
   // ==================== Popup ↔ Page Sync ====================
   // Apply popup setting changes live. Ignore stats/statsAllTime keys to avoid
   // an incrementStat → onChanged → filterJobCards → labelCard → incrementStat loop.
-  const SETTING_KEYS = [
-    "siftPaused",
-    "skippedCompanies",
-    "skippedTitleKeywords",
-    "sponsorCheckEnabled",
-    "unpaidCheckEnabled",
-    "autoSkipDetected",
-    "dimFiltered",
-    "hideFiltered",
-  ];
+  // Source of truth: src/shared/setting-keys.js — keeps feed.js and
+  // content.js from drifting when a new setting is added.
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
-    if (!SETTING_KEYS.some((k) => k in changes)) return;
+    if (!Object.keys(changes).some((k) => JOBS_PAGE_SETTING_KEYS.has(k))) return;
 
     chrome.storage.local.get(
       {

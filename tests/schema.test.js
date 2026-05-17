@@ -100,6 +100,26 @@ describe("validateImport", () => {
     expect(result.ok).toBe(false);
     expect(result.errors.length).toBe(3);
   });
+
+  it("rejects feedKeywordMatchMode values outside the enum", () => {
+    // Field is typeof "string" so the type-check passes — but "REGEX"
+    // (wrong case), "fuzzy" (made up), and "" (empty) all silently
+    // degraded to substring at runtime before this guard existed.
+    // (S4 from the review.)
+    const cases = ["REGEX", "fuzzy", "", "WHOLE_WORD"];
+    for (const bad of cases) {
+      const result = validateImport({ schemaVersion: 2, feedKeywordMatchMode: bad });
+      expect(result.ok, `expected reject for "${bad}"`).toBe(false);
+      expect(result.errors[0]).toMatch(/feedKeywordMatchMode/);
+    }
+  });
+
+  it("accepts the three valid feedKeywordMatchMode values", () => {
+    for (const good of ["wholeWord", "substring", "regex"]) {
+      const result = validateImport({ schemaVersion: 2, feedKeywordMatchMode: good });
+      expect(result.ok, `expected accept for "${good}"`).toBe(true);
+    }
+  });
 });
 
 describe("migrate", () => {
@@ -163,6 +183,16 @@ describe("estimateBytes / formatBytes", () => {
   it("estimates JSON-serialized byte count", () => {
     expect(estimateBytes({})).toBeGreaterThan(0);
     expect(estimateBytes({ a: "x" })).toBeLessThan(estimateBytes({ a: "x".repeat(100) }));
+  });
+
+  it("returns Infinity on JSON serialization failure (fail-safe for quota check)", () => {
+    // Circular ref → JSON.stringify throws → estimateBytes returns Infinity.
+    // The import pre-flight check uses `projected > QUOTA * 0.95` to decide
+    // whether to abort; Infinity guarantees abort if we can't measure.
+    // Returning 0 (the old behavior) would let a bad payload through.
+    const circular = {};
+    circular.self = circular;
+    expect(estimateBytes(circular)).toBe(Infinity);
   });
 
   it("formats bytes into human-readable units", () => {

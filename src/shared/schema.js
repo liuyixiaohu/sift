@@ -21,6 +21,10 @@ export const STORAGE_BLOCK_FRACTION = 0.95;
 //   "boolean" / "number" / "string" — typeof match
 //   "string[]"                       — Array of strings
 //   "object"                         — non-null plain object
+//
+// Enum constraints (validated separately after type-check) live in
+// SCHEMA_ENUMS below — adding to that map flags any out-of-range value
+// without needing a new type tag.
 const SCHEMA_TYPES = {
   // Schema version itself
   schemaVersion: "number",
@@ -59,6 +63,15 @@ const SCHEMA_TYPES = {
   statsAllTime: "object",
 };
 
+// Enum constraints for known keys. `validateImport` checks these AFTER the
+// type-check passes, so any mismatch reports as a specific error rather
+// than silently degrading at runtime (e.g. `feedKeywordMatchMode: "REGEX"`
+// — typeof string, so old `SCHEMA_TYPES` check passed; then matching.js
+// fell through to substring because the switch didn't recognize the value).
+const SCHEMA_ENUMS = {
+  feedKeywordMatchMode: ["wholeWord", "substring", "regex"],
+};
+
 function checkType(value, expected) {
   switch (expected) {
     case "boolean":
@@ -94,6 +107,14 @@ export function validateImport(data) {
     if (!(key in data)) continue; // missing keys are fine — defaults fill in
     if (!checkType(data[key], expected)) {
       errors.push(`"${key}" should be ${humanType(expected)}, got ${humanActual(data[key])}.`);
+      continue; // Don't enum-check a value that already failed the type-check
+    }
+    // Enum check (when defined for this key)
+    const allowed = SCHEMA_ENUMS[key];
+    if (allowed && !allowed.includes(data[key])) {
+      errors.push(
+        `"${key}" should be one of [${allowed.map((v) => `"${v}"`).join(", ")}], got "${data[key]}".`
+      );
     }
   }
 
@@ -156,12 +177,16 @@ export function migrate(data) {
 /**
  * Approximate bytes the given object would occupy in chrome.storage.local.
  * Chrome counts the JSON-serialized length of each key + its value.
+ *
+ * Returns `Infinity` (NOT 0) on failure so the pre-flight quota check in
+ * the import path fails-safe — refuses an import we couldn't measure
+ * rather than letting it pass with a phantom 0-byte estimate.
  */
 export function estimateBytes(data) {
   try {
     return new Blob([JSON.stringify(data)]).size;
   } catch {
-    return 0;
+    return Infinity;
   }
 }
 

@@ -1,12 +1,18 @@
 # Changelog
 
-## v2.13
+## v2.14
 
 ### Fixed
 - **Profile page no longer hides the entire main column.** LinkedIn's 2026 profile DOM nests the Analytics section inside the outer profile `<section>`; the old `:has()` selector matched transitively and hid both. The rule now constrains to the innermost matching section so only the Analytics widget is hidden.
 
 ### Internal
-- `npm run pack` — new script that produces a Chrome Web Store-ready ZIP under `dist/sift-vX.Y.zip` containing only what the manifest references at runtime (no `src/`, no tests, no docs). Bumps validate manifest + package.json version drift before zipping.
+- `npm run pack` — new script that produces a Chrome Web Store-ready ZIP under `dist/sift-vX.Y.zip` containing only what the manifest references at runtime (no `src/`, no tests, no docs). Validates manifest + package.json version drift before zipping.
+
+---
+
+## v2.13
+
+Released to the Chrome Web Store before the profile-content-hidden fix had merged. See v2.14 for the actual fix — users on v2.13 with **Hide Analytics** enabled on `/in/*` pages would have seen the entire profile column disappear.
 
 ---
 

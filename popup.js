@@ -86,12 +86,7 @@
       push("Sidebar widgets", diag.profile.noise, !!settings.hideProfileSuggestions, true);
     } else if (diag.pageType === "profile") {
       push("Analytics", diag.profile.analytics, !!settings.hideProfileAnalytics, true);
-      push(
-        "Suggestion widgets",
-        diag.profile.noise,
-        !!settings.hideProfileSuggestions,
-        true
-      );
+      push("Suggestion widgets", diag.profile.noise, !!settings.hideProfileSuggestions, true);
     } else if (diag.pageType === "jobs") {
       if (diag.jobs.flagged > 0) {
         items.push({ label: "Flagged jobs", n: diag.jobs.flagged, severity: "ok" });

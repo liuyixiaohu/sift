@@ -346,9 +346,21 @@ import {
     profileTitle.textContent = "Profile Page";
     profileGroup.appendChild(profileTitle);
 
-    profileGroup.appendChild(createToggle("Hide Analytics", settings.hideProfileAnalytics, function (v) {
-      chrome.storage.local.set({ hideProfileAnalytics: v });
-    }));
+    profileGroup.appendChild(
+      createToggle("Hide Analytics", settings.hideProfileAnalytics, function (v) {
+        chrome.storage.local.set({ hideProfileAnalytics: v });
+      })
+    );
+
+    profileGroup.appendChild(
+      createToggle(
+        "Hide Suggestions & Ads",
+        settings.hideProfileSuggestions,
+        function (v) {
+          chrome.storage.local.set({ hideProfileSuggestions: v });
+        }
+      )
+    );
 
     container.appendChild(profileGroup);
 

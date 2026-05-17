@@ -19,6 +19,7 @@
     hasSeenOnboarding: false,
     // Profile page
     hideProfileAnalytics: true,
+    hideProfileSuggestions: true,
     // Jobs page
     sponsorCheckEnabled: true,
     unpaidCheckEnabled: true,

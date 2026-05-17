@@ -19,6 +19,7 @@
     hasSeenOnboarding: false,
     // Profile page
     hideProfileAnalytics: true,
+    hideProfileSuggestions: true,
     // Jobs page
     sponsorCheckEnabled: true,
     unpaidCheckEnabled: true,
@@ -99,6 +100,7 @@
     feedKeywords: "string[]",
     // Profile-page toggles
     hideProfileAnalytics: "boolean",
+    hideProfileSuggestions: "boolean",
     // Jobs-page toggles + lists
     sponsorCheckEnabled: "boolean",
     unpaidCheckEnabled: "boolean",
@@ -451,9 +453,20 @@
       profileTitle.className = "section-title";
       profileTitle.textContent = "Profile Page";
       profileGroup.appendChild(profileTitle);
-      profileGroup.appendChild(createToggle("Hide Analytics", settings.hideProfileAnalytics, function(v) {
-        chrome.storage.local.set({ hideProfileAnalytics: v });
-      }));
+      profileGroup.appendChild(
+        createToggle("Hide Analytics", settings.hideProfileAnalytics, function(v) {
+          chrome.storage.local.set({ hideProfileAnalytics: v });
+        })
+      );
+      profileGroup.appendChild(
+        createToggle(
+          "Hide Suggestions & Ads",
+          settings.hideProfileSuggestions,
+          function(v) {
+            chrome.storage.local.set({ hideProfileSuggestions: v });
+          }
+        )
+      );
       container.appendChild(profileGroup);
       let jobsGroup = document.createElement("div");
       jobsGroup.className = "section-group";

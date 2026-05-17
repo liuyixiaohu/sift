@@ -40,6 +40,7 @@ const SCHEMA_TYPES = {
 
   // Profile-page toggles
   hideProfileAnalytics: "boolean",
+  hideProfileSuggestions: "boolean",
 
   // Jobs-page toggles + lists
   sponsorCheckEnabled: "boolean",

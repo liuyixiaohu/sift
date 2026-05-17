@@ -36,6 +36,17 @@ body.lj-hide-profile-analytics
   display: none !important;
 }
 
+/* Profile page: hide suggestion widgets and ad banners.
+ * Sections are tagged with data-lj-profile-noise="true" by feed.js when their
+ * heading matches PROFILE_NOISE_HEADINGS ("Suggested for you", "Who your
+ * viewers also viewed", "People you may know", "You might like"). Ad iframe
+ * wrappers (LinkedIn renders ads via <iframe title="advertisement">) are
+ * tagged the same way. One body class, one selector, one rule.
+ */
+body.lj-hide-profile-suggestions [data-lj-profile-noise="true"] {
+  display: none !important;
+}
+
 /* Hide upsell CTAs (Campaign Manager, etc.) */
 body.lj-hide-promoted footer.artdeco-card__actions:has(a[href*="/campaignmanager/"]) {
   display: none !important;

@@ -5,6 +5,9 @@
 
 export const state = {
   // Settings (mirrors keys in src/shared/defaults.js, refreshed from chrome.storage).
+  // siftPaused is mirrored from storage so labelCard etc. can short-circuit
+  // without re-reading storage on every card evaluation.
+  siftPaused: false,
   skippedCompanies: [],
   skippedTitleKeywords: [],
   sponsorCheckEnabled: true,

@@ -2,6 +2,9 @@
   // src/jobs/state.js
   var state = {
     // Settings (mirrors keys in src/shared/defaults.js, refreshed from chrome.storage).
+    // siftPaused is mirrored from storage so labelCard etc. can short-circuit
+    // without re-reading storage on every card evaluation.
+    siftPaused: false,
     skippedCompanies: [],
     skippedTitleKeywords: [],
     sponsorCheckEnabled: true,
@@ -92,11 +95,12 @@
       hideFiltered: _defaults.hideFiltered ?? false
     });
     const active = !data.siftPaused;
+    state.siftPaused = !!data.siftPaused;
     state.skippedCompanies = data.skippedCompanies;
     state.skippedTitleKeywords = data.skippedTitleKeywords;
     state.sponsorCheckEnabled = data.sponsorCheckEnabled;
     state.unpaidCheckEnabled = data.unpaidCheckEnabled;
-    state.autoSkipDetected = data.autoSkipDetected;
+    state.autoSkipDetected = active && data.autoSkipDetected;
     state.hasSeenIntro = data.hasSeenIntro;
     state.panelPosition = data.panelPosition;
     state.cardsDimmed = active && data.dimFiltered;
@@ -116,14 +120,28 @@
     const batch = state.pendingStats;
     state.pendingStats = {};
     if (Object.keys(batch).length === 0) return;
+    const reschedule = (reason) => {
+      console.warn("[Sift] flushStats failed (" + reason + "); re-queueing batch");
+      for (const [key, count] of Object.entries(batch)) {
+        state.pendingStats[key] = (state.pendingStats[key] || 0) + count;
+      }
+    };
     chrome.storage.local.get({ stats: {}, statsAllTime: {} }, (d) => {
+      if (chrome.runtime.lastError) {
+        reschedule("storage.get: " + chrome.runtime.lastError.message);
+        return;
+      }
       const today = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
       if (d.stats.today !== today) d.stats = { today };
       for (const [key, count] of Object.entries(batch)) {
         d.stats[key] = (d.stats[key] || 0) + count;
         d.statsAllTime[key] = (d.statsAllTime[key] || 0) + count;
       }
-      chrome.storage.local.set({ stats: d.stats, statsAllTime: d.statsAllTime });
+      chrome.storage.local.set({ stats: d.stats, statsAllTime: d.statsAllTime }, () => {
+        if (chrome.runtime.lastError) {
+          reschedule("storage.set: " + chrome.runtime.lastError.message);
+        }
+      });
     });
   }
 
@@ -428,6 +446,7 @@
     return containsWordOf(title, state.skippedTitleKeywords);
   }
   function labelCard(card, reason) {
+    if (state.siftPaused) return false;
     const existing = card.dataset.ljReasons ? card.dataset.ljReasons.split(",") : [];
     if (existing.includes(reason)) return false;
     existing.push(reason);
@@ -604,8 +623,13 @@
         e.stopPropagation();
         try {
           options.undo();
-        } finally {
           dismiss();
+        } catch (err) {
+          console.error("[Sift] Toast undo callback threw:", err);
+          dismiss();
+          setTimeout(() => {
+            showToast("Undo failed \u2014 your skip list may be out of sync");
+          }, 0);
         }
       });
       toast.appendChild(undoBtn);
@@ -1247,14 +1271,22 @@
     const INIT_DELAY_MS = 1500;
     async function init() {
       if (!isSearchPage()) return;
-      await loadSettings();
-      createUI();
-      filterJobCards();
-      checkDetailPanel({ renderLists });
-      if (!state.hasSeenIntro) {
-        showToast("Click Scan Jobs to filter all visible listings");
-        state.hasSeenIntro = true;
-        saveValue("hasSeenIntro", true);
+      try {
+        await loadSettings();
+        createUI();
+        filterJobCards();
+        checkDetailPanel({ renderLists });
+        if (!state.hasSeenIntro) {
+          showToast("Click Scan Jobs to filter all visible listings");
+          state.hasSeenIntro = true;
+          saveValue("hasSeenIntro", true);
+        }
+      } catch (err) {
+        console.error("[Sift] Jobs init failed:", err);
+        try {
+          showToast("Sift failed to load on this page \u2014 check the console");
+        } catch {
+        }
       }
     }
     if (document.readyState === "complete") {
@@ -1289,15 +1321,31 @@
           hideFiltered: false
         },
         (data) => {
+          if (chrome.runtime.lastError) {
+            console.warn(
+              "[Sift] storage.get in onChanged failed:",
+              chrome.runtime.lastError.message
+            );
+            return;
+          }
           const active = !data.siftPaused;
+          state.siftPaused = !!data.siftPaused;
           state.skippedCompanies = data.skippedCompanies;
           state.skippedTitleKeywords = data.skippedTitleKeywords;
           state.sponsorCheckEnabled = data.sponsorCheckEnabled;
           state.unpaidCheckEnabled = data.unpaidCheckEnabled;
-          state.autoSkipDetected = data.autoSkipDetected;
+          state.autoSkipDetected = active && data.autoSkipDetected;
           state.cardsDimmed = active && data.dimFiltered;
           state.cardsHidden = active && data.hideFiltered;
           renderLists();
+          if ("siftPaused" in changes && state.siftPaused) {
+            document.querySelectorAll("[data-lj-reasons]").forEach((c) => {
+              clearBadges(c);
+              delete c.dataset.ljReasons;
+              delete c.dataset.ljFiltered;
+            });
+            state.labeledJobs = /* @__PURE__ */ new Map();
+          }
           if ("siftPaused" in changes) {
             document.querySelectorAll(".lj-card-hidden, .lj-card-dimmed").forEach((c) => c.classList.remove("lj-card-hidden", "lj-card-dimmed"));
           }

@@ -4,7 +4,7 @@
 
 import { isSearchPage, state } from "./jobs/state.js";
 import { loadSettings } from "./jobs/storage.js";
-import { filterJobCards } from "./jobs/labels.js";
+import { clearBadges, filterJobCards } from "./jobs/labels.js";
 import { createUI, renderLists } from "./jobs/panel.js";
 import { checkDetailPanel } from "./jobs/active.js";
 import {
@@ -21,15 +21,29 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
 
   async function init() {
     if (!isSearchPage()) return;
-    await loadSettings();
-    createUI();
-    filterJobCards();
-    checkDetailPanel({ renderLists });
+    try {
+      await loadSettings();
+      createUI();
+      filterJobCards();
+      checkDetailPanel({ renderLists });
 
-    if (!state.hasSeenIntro) {
-      showToast("Click Scan Jobs to filter all visible listings");
-      state.hasSeenIntro = true;
-      saveValue("hasSeenIntro", true);
+      if (!state.hasSeenIntro) {
+        showToast("Click Scan Jobs to filter all visible listings");
+        state.hasSeenIntro = true;
+        saveValue("hasSeenIntro", true);
+      }
+    } catch (err) {
+      // Without this catch the rejection from chrome.storage.get (or a
+      // throw inside createUI / filterJobCards) becomes an unhandled
+      // promise rejection. The page then looks like vanilla LinkedIn and
+      // the user concludes Sift uninstalled itself. Surface it.
+      console.error("[Sift] Jobs init failed:", err);
+      try {
+        showToast("Sift failed to load on this page — check the console");
+      } catch {
+        // showToast itself depends on document.body being ready; if even
+        // that fails, console.error above is the floor we accept.
+      }
     }
   }
 
@@ -71,21 +85,45 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
         hideFiltered: false,
       },
       (data) => {
+        if (chrome.runtime.lastError) {
+          console.warn(
+            "[Sift] storage.get in onChanged failed:",
+            chrome.runtime.lastError.message
+          );
+          return;
+        }
         const active = !data.siftPaused;
+        state.siftPaused = !!data.siftPaused;
         state.skippedCompanies = data.skippedCompanies;
         state.skippedTitleKeywords = data.skippedTitleKeywords;
         state.sponsorCheckEnabled = data.sponsorCheckEnabled;
         state.unpaidCheckEnabled = data.unpaidCheckEnabled;
-        state.autoSkipDetected = data.autoSkipDetected;
-        // Pause suppresses the visual filter — cards keep their data-lj-reasons
-        // (badges remain) but lj-card-hidden / lj-card-dimmed get cleared on
-        // re-filter below. On unpause, processedCards reset lets cards re-apply.
+        // Pause gates auto-skip; otherwise the user's skip list keeps
+        // growing silently while the popup advertises "All filtering
+        // suspended" — that's a quiet liar.
+        state.autoSkipDetected = active && data.autoSkipDetected;
+        // Pause suppresses the visual filter. labelCard short-circuits on
+        // state.siftPaused so new cards stay unmarked; we tear down the
+        // existing decoration below so the page reads as vanilla LinkedIn.
         state.cardsDimmed = active && data.dimFiltered;
         state.cardsHidden = active && data.hideFiltered;
         renderLists();
-        // Pause flipped → drop any existing dim/hide classes; filterJobCards
-        // will re-apply them on unpause based on the updated state flags.
+        if ("siftPaused" in changes && state.siftPaused) {
+          // Pause just turned ON — strip every Sift-painted artifact so
+          // "All filtering suspended" reads true. data-lj-reasons goes too,
+          // so unpause re-detects fresh via filterJobCards below.
+          document.querySelectorAll("[data-lj-reasons]").forEach((c) => {
+            clearBadges(c);
+            delete c.dataset.ljReasons;
+            delete c.dataset.ljFiltered;
+          });
+          // labeledJobs is a recovery cache for DOM-replacement events;
+          // dropping it forces clean re-population on unpause.
+          state.labeledJobs = new Map();
+        }
         if ("siftPaused" in changes) {
+          // Always clear dim/hide on pause-flip (going either way) —
+          // they get re-added by applyBadges on the next labelCard.
           document
             .querySelectorAll(".lj-card-hidden, .lj-card-dimmed")
             .forEach((c) => c.classList.remove("lj-card-hidden", "lj-card-dimmed"));

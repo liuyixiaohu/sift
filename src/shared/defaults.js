@@ -9,7 +9,6 @@ export const SIFT_DEFAULTS = {
   hideSuggested: true,
   hideRecommended: true,
   hideNonConnections: false,
-  hideSidebar: true,
   hidePolls: false,
   hideCelebrations: false,
   feedKeywordFilterEnabled: true,

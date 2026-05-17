@@ -1,29 +1,50 @@
 <!--
-  Feed post fixture — a single "Promoted" article.
+  Feed-post fixture: a "Promoted" article — calibrated against live LinkedIn
+  DOM (captured 2026-05).
 
-  LinkedIn's 2026 DOM uses div[data-display-contents] inside [role="list"]
-  for posts (not [role="article"] anymore — see feed.js#feedPosts which
-  falls back to the legacy selector for older layouts).
+  KEY REAL-WORLD STRUCTURE:
 
-  Type labels ("Promoted", "Suggested", etc.) are rendered as leaf
-  <span>/<a>/<p> elements inside the post. detectPostLabels(article) walks
-  all leaves looking for an exact text match against POST_TYPE_LABELS.
+  1. <main> has NO `role="main"` (bare <main>).
+
+  2. Posts are direct children of `<div role="list">` — the wrapper is a
+     `<div role="list">`, NOT a `<ul>` or `<ol>`. feed.js#feedPosts queries
+     `[role="list"]` for this reason.
+
+  3. Posts wrap as `<div data-display-contents="true">` direct children of
+     `[role="list"]`. feed.js#feedPosts uses `:scope > [data-display-contents]`
+     to find them — direct-child match is what makes that query precise.
+
+  4. Inside the outer [data-display-contents] there's a <div role="listitem">
+     several divs deep, containing the actual post content + the leaf
+     "Promoted" label.
+
+  5. The "Promoted" label is a leaf <span> with EXACT text "Promoted".
+     detectPostLabels walks all span/a/p leaves looking for POST_TYPE_LABELS.
+
+  6. Follow button has aria-label STARTING WITH "Follow" (not exact match).
+     The non-connection signal uses `button[aria-label*="Follow"]`.
 -->
 <!doctype html>
 <html lang="en">
   <body>
-    <main role="main">
+    <main>
       <div role="list">
-        <div data-display-contents>
-          <article>
-            <header>
-              <a href="/company/example/"><span>Example Co.</span></a>
-              <!-- The "Promoted" label — leaf <span> with exact text -->
-              <span>Promoted</span>
-            </header>
-            <p>This is the promoted post body content.</p>
-            <button aria-label="Follow Example Co.">Follow</button>
-          </article>
+        <!-- Outer post wrapper — direct child of [role="list"] -->
+        <div data-display-contents="true">
+          <div>
+            <div role="listitem">
+              <div>
+                <header>
+                  <a href="/company/example"><span>Example Co.</span></a>
+                  <p><span>Promoted</span></p>
+                </header>
+                <p>Sample promoted post body.</p>
+                <button aria-label="Follow Example Co.">Follow</button>
+                <!-- Control menu button — used by Unfollow injection -->
+                <button aria-label="Open control menu for this post">…</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </main>

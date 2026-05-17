@@ -1,70 +1,91 @@
 <!--
-  Minimal but structurally accurate profile-page fixture.
+  Profile-page fixture — structurally calibrated against live LinkedIn DOM
+  (captured 2026-05, /in/<user>/).
 
-  Anchors we assert against (and which feature relies on each):
+  KEY DEPARTURES from a naïve hand-written fixture:
 
-  1. Outer <section aria-label="Primary content"> wraps inner sections.
-     The CSS rule `body.lj-hide-profile-analytics
-     section:has(a[href*="/dashboard"]):not(:has(section a[href*="/dashboard"]))`
-     depends on Analytics being an INNER section inside this outer one.
-     (See feed.css "Hide Analytics" rule; the :not(:has(...)) clause exists
-     specifically to avoid the outer match.)
+  1. <main> has NO `role="main"` attribute — bare `<main>`. feed.js#feedMain
+     queries `main[role="main"]` FIRST, then falls back to plain `main`. The
+     fallback is load-bearing; this fixture exercises the fallback path.
 
-  2. Inner <section> with <h2>Analytics</h2> + <a href=".../dashboard/">.
-     - URL-based hide depends on the /dashboard link
-     - JS-marker heading-text fallback (PR #43) depends on the leaf <h2>"Analytics"
+  2. The right-rail <aside> is `aria-label="Aside"` (LinkedIn's actual label),
+     not "Right rail" / "Sidebar".
 
-  3. Inner <section> with <h2>Suggested for you</h2> heading.
-     hideProfileSuggestions hooks the PROFILE_NOISE_HEADINGS marker on this.
+  3. The <aside> is NESTED INSIDE <main>, not a sibling. findNoiseWrapper
+     walks up until parent is ASIDE/MAIN/BODY — works either way, but the
+     real structure is "aside inside main".
 
-  4. <aside aria-label="Right rail"> with widget sections "People you may know"
-     and "You might like". Same marker mechanism.
+  4. The Analytics section has BOTH `/dashboard` AND `/analytics` anchors
+     during LinkedIn's URL rollout (different cohorts may see only one).
+     The CSS rule keys on `/dashboard`; the JS-marker heading-text fallback
+     handles the `/analytics`-only future.
 
-  5. <iframe title="advertisement"> — WCAG-required attribute used as the
-     stablest anchor for ads (see learning_linkedin_dom_anchors).
+  5. "Suggested for you" lives INSIDE `<section aria-label="Primary content">`
+     (the outer profile wrapper). "People you may know" / "You might like"
+     live inside the inner <aside>. Different wrappers, same marker.
+
+  6. Multiple intermediate <div> layers exist in real DOM (~7 between heading
+     and aside). We include 2-3 here — enough to exercise the up-walk in
+     findNoiseWrapper without bloating the fixture.
 -->
 <!doctype html>
 <html lang="en">
   <body>
     <main>
       <section aria-label="Primary content">
-        <!-- Analytics widget (innermost section with /dashboard link) -->
+        <!-- Analytics widget: innermost section with /dashboard AND /analytics links -->
         <section>
-          <h2>Analytics</h2>
-          <p>Private to you</p>
-          <a href="/in/kun-l/dashboard/">View all analytics</a>
+          <div>
+            <div>
+              <h2>Analytics</h2>
+              <p>Private to you</p>
+              <a href="/in/example/dashboard/">View all analytics</a>
+              <a href="/in/example/analytics/">Past 7 days</a>
+            </div>
+          </div>
         </section>
 
-        <!-- Suggested for you widget -->
+        <!-- Suggested for you widget (inside Primary content, not aside) -->
         <section>
-          <h2>Suggested for you</h2>
-          <p>Based on your profile</p>
-          <button>Add skills</button>
+          <div>
+            <h2>Suggested for you</h2>
+            <p>Based on your profile</p>
+            <button>Add skills</button>
+          </div>
         </section>
 
-        <!-- Real profile content (should NOT be hidden) -->
+        <!-- Real profile content — must NOT be hidden by either rule -->
         <section>
           <h2>About</h2>
           <p>Real bio content here.</p>
         </section>
       </section>
+
+      <!-- ASIDE inside MAIN (LinkedIn's actual nesting) -->
+      <aside aria-label="Aside">
+        <section>
+          <div>
+            <div>
+              <h2>People you may know</h2>
+              <p>Based on your profile</p>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <div>
+            <h2>You might like</h2>
+            <p>Newsletters and pages</p>
+          </div>
+        </section>
+
+        <!-- Ad iframe — WCAG title is the stablest anchor LinkedIn can't drop -->
+        <div>
+          <div>
+            <iframe title="advertisement" src="about:blank"></iframe>
+          </div>
+        </div>
+      </aside>
     </main>
-
-    <aside aria-label="Right rail">
-      <section>
-        <h2>People you may know</h2>
-        <p>Based on your profile</p>
-      </section>
-
-      <section>
-        <h2>You might like</h2>
-        <p>Newsletters and pages</p>
-      </section>
-
-      <!-- Ad iframe inside aside (typical placement) -->
-      <div class="ad-wrapper">
-        <iframe title="advertisement" src="about:blank"></iframe>
-      </div>
-    </aside>
   </body>
 </html>

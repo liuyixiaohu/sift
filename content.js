@@ -145,6 +145,31 @@
     });
   }
 
+  // src/shared/lists.js
+  function containsCi(list, item) {
+    if (!list || typeof item !== "string") return false;
+    const lower = item.toLowerCase();
+    return list.some((x) => typeof x === "string" && x.toLowerCase() === lower);
+  }
+  function addUnique(list, item) {
+    if (containsCi(list, item)) return false;
+    list.push(item);
+    return true;
+  }
+  function escapeRegex(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  function matchesWholeWord(haystack, needle) {
+    if (typeof haystack !== "string" || typeof needle !== "string") return false;
+    if (haystack.length === 0 || needle.length === 0) return false;
+    return new RegExp(`(?<!\\w)${escapeRegex(needle)}(?!\\w)`, "i").test(haystack);
+  }
+  function containsWordOf(text, list) {
+    if (!list || list.length === 0) return false;
+    if (typeof text !== "string" || text.length === 0) return false;
+    return list.some((item) => matchesWholeWord(text, item));
+  }
+
   // src/shared/matching.js
   function keywordsToRegex(keywords) {
     return new RegExp(keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|"), "i");
@@ -406,31 +431,6 @@
     }
     const text = getDetailText();
     return text ? text.trim().substring(0, 200) : "";
-  }
-
-  // src/shared/lists.js
-  function containsCi(list, item) {
-    if (!list || typeof item !== "string") return false;
-    const lower = item.toLowerCase();
-    return list.some((x) => typeof x === "string" && x.toLowerCase() === lower);
-  }
-  function addUnique(list, item) {
-    if (containsCi(list, item)) return false;
-    list.push(item);
-    return true;
-  }
-  function escapeRegex(s) {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
-  function matchesWholeWord(haystack, needle) {
-    if (typeof haystack !== "string" || typeof needle !== "string") return false;
-    if (haystack.length === 0 || needle.length === 0) return false;
-    return new RegExp(`(?<!\\w)${escapeRegex(needle)}(?!\\w)`, "i").test(haystack);
-  }
-  function containsWordOf(text, list) {
-    if (!list || list.length === 0) return false;
-    if (typeof text !== "string" || text.length === 0) return false;
-    return list.some((item) => matchesWholeWord(text, item));
   }
 
   // src/jobs/labels.js
@@ -1265,6 +1265,18 @@
     }, BOOT_POLL_INTERVAL_MS);
   }
 
+  // src/shared/setting-keys.js
+  var JOBS_PAGE_SETTING_KEYS = /* @__PURE__ */ new Set([
+    "siftPaused",
+    "skippedCompanies",
+    "skippedTitleKeywords",
+    "sponsorCheckEnabled",
+    "unpaidCheckEnabled",
+    "autoSkipDetected",
+    "dimFiltered",
+    "hideFiltered"
+  ]);
+
   // src/content.js
   if (chrome.runtime?.id && !window.__ljContentLoaded) {
     window.__ljContentLoaded = true;
@@ -1296,19 +1308,9 @@
     }
     attachRouteHandlers({ init, renderLists });
     bootstrapJobsObserver({ renderLists });
-    const SETTING_KEYS = [
-      "siftPaused",
-      "skippedCompanies",
-      "skippedTitleKeywords",
-      "sponsorCheckEnabled",
-      "unpaidCheckEnabled",
-      "autoSkipDetected",
-      "dimFiltered",
-      "hideFiltered"
-    ];
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
-      if (!SETTING_KEYS.some((k) => k in changes)) return;
+      if (!Object.keys(changes).some((k) => JOBS_PAGE_SETTING_KEYS.has(k))) return;
       chrome.storage.local.get(
         {
           siftPaused: false,

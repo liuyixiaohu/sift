@@ -1,5 +1,7 @@
 // Sift — keyword matching utilities
 
+import { matchesWholeWord } from "./lists.js";
+
 /**
  * Build a case-insensitive regex from an array of keyword strings.
  * Special regex characters in keywords are escaped.
@@ -11,13 +13,12 @@ export function keywordsToRegex(keywords) {
 /**
  * Match modes for feed keyword filtering.
  *
- *   "wholeWord"  — default for new installs. Wraps each keyword in `\b`
- *                  boundaries, so "ai" matches "I work in AI." but NOT
- *                  "training", "rain", "fail". Avoids the bulk of false
- *                  positives users hit with substring mode. Edge cases
- *                  (hashtags like "#ai", symbols like "c++") fall through
- *                  to substring for that keyword since `\b` doesn't
- *                  recognize non-word characters as boundaries.
+ *   "wholeWord"  — default for new installs. Delegates per keyword to
+ *                  `matchesWholeWord` (in lists.js) which uses
+ *                  `(?<!\w)…(?!\w)` lookbehind/lookahead — correctly
+ *                  handles non-word edges (hashtags like "#ai", symbols
+ *                  like "c++"). "ai" matches "I work in AI." but NOT
+ *                  "training" / "rain" / "fail" / "abc++d".
  *
  *   "substring"  — original behavior. Case-insensitive substring match.
  *                  Preserved as the migration target for users on
@@ -65,21 +66,6 @@ export function validateKeywords(keywords, mode) {
   return out;
 }
 
-// `\b` only marks transitions between word chars [a-zA-Z0-9_] and non-word
-// chars. A keyword starting/ending with a non-word char (e.g. "#ai", "c++")
-// won't behave intuitively — for those, fall back to substring on a
-// per-keyword basis so the user's keyword still does something useful.
-function startsWithWordChar(s) {
-  return /^\w/.test(s);
-}
-function endsWithWordChar(s) {
-  return /\w$/.test(s);
-}
-
-function escapeRegex(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
 /**
  * Check if text contains any of the given keywords. Returns the first matching
  * keyword, or null if none match.
@@ -103,29 +89,15 @@ export function matchesFeedKeyword(text, keywords, mode = "substring") {
     return null;
   }
 
-  const lower = text.toLowerCase();
-
   if (mode === "wholeWord") {
     for (const kw of keywords) {
-      if (!kw) continue;
-      const prefix = startsWithWordChar(kw) ? "\\b" : "";
-      const suffix = endsWithWordChar(kw) ? "\\b" : "";
-      // Both ends non-word → no `\b` wrapper would apply, so fall back to
-      // case-insensitive substring (current behavior for hashtags etc.).
-      if (!prefix && !suffix) {
-        if (lower.includes(kw.toLowerCase())) return kw;
-        continue;
-      }
-      try {
-        if (new RegExp(prefix + escapeRegex(kw) + suffix, "i").test(text)) return kw;
-      } catch {
-        if (lower.includes(kw.toLowerCase())) return kw;
-      }
+      if (kw && matchesWholeWord(text, kw)) return kw;
     }
     return null;
   }
 
   // mode === "substring" (legacy default; migration target for v1 users)
+  const lower = text.toLowerCase();
   for (const kw of keywords) {
     if (kw && lower.includes(kw.toLowerCase())) return kw;
   }

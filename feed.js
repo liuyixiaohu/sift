@@ -62,6 +62,16 @@
     }
   };
 
+  // src/shared/lists.js
+  function escapeRegex(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  function matchesWholeWord(haystack, needle) {
+    if (typeof haystack !== "string" || typeof needle !== "string") return false;
+    if (haystack.length === 0 || needle.length === 0) return false;
+    return new RegExp(`(?<!\\w)${escapeRegex(needle)}(?!\\w)`, "i").test(haystack);
+  }
+
   // src/shared/matching.js
   function validateKeywords(keywords, mode) {
     const out = { valid: [], invalid: [] };
@@ -82,15 +92,6 @@
     }
     return out;
   }
-  function startsWithWordChar(s) {
-    return /^\w/.test(s);
-  }
-  function endsWithWordChar(s) {
-    return /\w$/.test(s);
-  }
-  function escapeRegex(s) {
-    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
   function matchesFeedKeyword(text, keywords, mode = "substring") {
     if (!keywords || keywords.length === 0) return null;
     if (mode === "regex") {
@@ -103,24 +104,13 @@
       }
       return null;
     }
-    const lower = text.toLowerCase();
     if (mode === "wholeWord") {
       for (const kw of keywords) {
-        if (!kw) continue;
-        const prefix = startsWithWordChar(kw) ? "\\b" : "";
-        const suffix = endsWithWordChar(kw) ? "\\b" : "";
-        if (!prefix && !suffix) {
-          if (lower.includes(kw.toLowerCase())) return kw;
-          continue;
-        }
-        try {
-          if (new RegExp(prefix + escapeRegex(kw) + suffix, "i").test(text)) return kw;
-        } catch {
-          if (lower.includes(kw.toLowerCase())) return kw;
-        }
+        if (kw && matchesWholeWord(text, kw)) return kw;
       }
       return null;
     }
+    const lower = text.toLowerCase();
     for (const kw of keywords) {
       if (kw && lower.includes(kw.toLowerCase())) return kw;
     }
@@ -150,6 +140,23 @@
         return 0;
     }
   }
+
+  // src/shared/setting-keys.js
+  var FEED_PAGE_SETTING_KEYS = /* @__PURE__ */ new Set([
+    "siftPaused",
+    "hidePromoted",
+    "hideSuggested",
+    "hideRecommended",
+    "hideNonConnections",
+    "hidePolls",
+    "hideCelebrations",
+    "feedKeywordFilterEnabled",
+    "feedKeywordMatchMode",
+    "feedKeywords",
+    "postAgeLimit",
+    "hideProfileAnalytics",
+    "hideProfileSuggestions"
+  ]);
 
   // src/feed.js
   if (chrome.runtime?.id) {
@@ -464,10 +471,10 @@
       }
       return null;
     }, markProfileNoise = function() {
-      const scopes = [
-        ...document.querySelectorAll("aside[aria-label]"),
-        document.querySelector("main")
-      ].filter(Boolean);
+      const root = feedDoc || document;
+      const scopes = isProfilePage() ? [...root.querySelectorAll("aside[aria-label]"), root.querySelector("main")].filter(
+        Boolean
+      ) : [...root.querySelectorAll("aside[aria-label]")];
       for (const scope of scopes) {
         scope.querySelectorAll("h1, h2, h3, h4, p").forEach((el) => {
           if (el.children.length > 0) return;
@@ -486,7 +493,7 @@
           }
         });
       }
-      document.querySelectorAll('iframe[title="advertisement"]').forEach((iframe) => {
+      root.querySelectorAll('iframe[title="advertisement"]').forEach((iframe) => {
         const wrapper = iframe.parentElement;
         if (wrapper && !wrapper.dataset.ljProfileNoise) {
           wrapper.dataset.ljProfileNoise = "true";
@@ -712,7 +719,7 @@
     let initialized = false;
     let feedDoc = document;
     const DEFAULTS = SIFT_DEFAULTS;
-    const SETTING_KEYS = /* @__PURE__ */ new Set(["siftPaused", "hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywordMatchMode", "feedKeywords", "postAgeLimit", "hideProfileAnalytics", "hideProfileSuggestions"]);
+    const SETTING_KEYS = FEED_PAGE_SETTING_KEYS;
     let settings = { ...DEFAULTS };
     const POST_TYPE_LABELS = /* @__PURE__ */ new Set([
       "Promoted",

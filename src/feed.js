@@ -4,6 +4,7 @@ import {
   parsePostAgeDays,
   validateKeywords,
 } from "./shared/matching.js";
+import { FEED_PAGE_SETTING_KEYS } from "./shared/setting-keys.js";
 
 if (chrome.runtime?.id) {
   "use strict";
@@ -52,7 +53,9 @@ if (chrome.runtime?.id) {
 
   // === Storage ===
   const DEFAULTS = SIFT_DEFAULTS;
-  const SETTING_KEYS = new Set(["siftPaused", "hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywordMatchMode", "feedKeywords", "postAgeLimit", "hideProfileAnalytics", "hideProfileSuggestions"]);
+  // Re-aliased so the storage.onChanged listener below reads clean.
+  // Source of truth: src/shared/setting-keys.js.
+  const SETTING_KEYS = FEED_PAGE_SETTING_KEYS;
   let settings = { ...DEFAULTS };
 
   function loadSettings(cb) {
@@ -488,12 +491,25 @@ if (chrome.runtime?.id) {
   }
 
   function markProfileNoise() {
-    // Limit the scan scope to sidebar/main containers — avoids hammering the
-    // whole document on each call, since this fires from the feed scan tick.
-    const scopes = [
-      ...document.querySelectorAll("aside[aria-label]"),
-      document.querySelector("main"),
-    ].filter(Boolean);
+    // Use feedDoc (which is the iframe document in LinkedIn's iframe-mode
+    // cohort, else === document). Without this, body class on feedDoc.body
+    // would never see matching descendants in the iframe and the
+    // hideProfileSuggestions toggle silently became a no-op for that cohort.
+    // (S6 from the review.)
+    const root = feedDoc || document;
+
+    // Scope optimization (N6): on feed pages, the widget headings we care
+    // about live in the right-rail aside ("LinkedIn News", "Today's
+    // puzzles") — there are no Suggested-for-you-style widgets inside
+    // <main>, which is just the post list (hundreds of <p> leaves per
+    // post). Skip the main walk on feed pages. On profile pages,
+    // Suggested-for-you / Analytics live in the Primary content section
+    // inside <main>, so we keep that scope.
+    const scopes = isProfilePage()
+      ? [...root.querySelectorAll("aside[aria-label]"), root.querySelector("main")].filter(
+          Boolean
+        )
+      : [...root.querySelectorAll("aside[aria-label]")];
 
     for (const scope of scopes) {
       // Heading-like leaves: <h1>-<h4> on profile sections, <p> on feed sidebar.
@@ -517,7 +533,7 @@ if (chrome.runtime?.id) {
 
     // LinkedIn's ad iframes are not inside a <section> and have no heading.
     // The required `title="advertisement"` (WCAG) is the stablest anchor.
-    document.querySelectorAll('iframe[title="advertisement"]').forEach((iframe) => {
+    root.querySelectorAll('iframe[title="advertisement"]').forEach((iframe) => {
       const wrapper = iframe.parentElement;
       if (wrapper && !wrapper.dataset.ljProfileNoise) {
         wrapper.dataset.ljProfileNoise = "true";

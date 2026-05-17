@@ -1,7 +1,7 @@
 import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
 import { relevantCountsFor } from "./shared/diag.js";
 import { addUnique, removeCi } from "./shared/lists.js";
-import { validateKeywords } from "./shared/matching.js";
+import { FEED_KEYWORD_MATCH_MODES, validateKeywords } from "./shared/matching.js";
 import {
   estimateBytes,
   formatBytes,
@@ -253,7 +253,16 @@ import {
   // the page type is relevant, but Sift sees ZERO matches. That's the
   // "your selector might have broken" signal.
 
-  function buildDiagnosticPanel(container, settings) {
+  function buildDiagnosticPanel(container, initialSettings) {
+    // The settings closure was a real footgun (S5 from the review): a
+    // user toggling Hide Ads off and then clicking the ↻ button still
+    // saw a ⚠ warn-severity chip on Ads=0 because relevantCountsFor()
+    // read the OLD toggle value from the closure. Fix by re-reading
+    // storage inside refresh() — costs one extra round-trip per click,
+    // worth it for honesty. We use `initialSettings` only as a key list
+    // for the storage.get default object.
+    const settingKeyDefaults = initialSettings;
+
     const wrap = document.createElement("div");
     wrap.className = "diag-panel";
     wrap.dataset.state = "loading";
@@ -285,7 +294,7 @@ import {
       body.appendChild(msg);
     }
 
-    function renderDiag(diag) {
+    function renderDiag(diag, currentSettings) {
       wrap.dataset.state = "ok";
       wrap.dataset.paused = diag.paused ? "true" : "false";
       body.innerHTML = "";
@@ -293,7 +302,7 @@ import {
       pill.className = "diag-page";
       pill.textContent = DIAG_PAGE_LABELS[diag.pageType] || diag.pageType;
       body.appendChild(pill);
-      const items = relevantCountsFor(diag, settings);
+      const items = relevantCountsFor(diag, currentSettings);
       if (items.length === 0) {
         const none = document.createElement("span");
         none.className = "diag-message";
@@ -338,44 +347,58 @@ import {
 
     function refresh() {
       renderMessage("loading", "Loading…");
-      chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-        const tab = tabs && tabs[0];
-        if (!tab || !tab.url || !tab.url.includes("linkedin.com")) {
-          renderMessage("empty", "Open LinkedIn to see what Sift detects");
-          return;
+      // Re-read settings on EVERY refresh so toggle changes since
+      // popup-open are reflected. Defaults supplied as the key list +
+      // safe fallbacks if storage returns missing keys.
+      chrome.storage.local.get(settingKeyDefaults, function (currentSettings) {
+        if (chrome.runtime.lastError) {
+          // Don't block the diag fetch on a settings read failure —
+          // fall back to the initial snapshot and warn in console.
+          console.warn(
+            "[Sift] diag settings read failed:",
+            chrome.runtime.lastError.message
+          );
+          currentSettings = settingKeyDefaults;
         }
-        chrome.tabs.sendMessage(tab.id, { type: "SIFT_DIAG" }, function (diag) {
-          // Distinguish error modes so the message we show actually maps to
-          // the root cause. Three distinct cases:
-          //   1. "Could not establish connection" — content script not loaded
-          //      on this tab. Reload advice is correct.
-          //   2. Any other lastError (e.g. "port closed before response")
-          //      — content script likely threw mid-response. Reload won't
-          //      help; point the user at the console.
-          //   3. Listener returned an `error` field — collectDiagnostics
-          //      caught an exception. Same: console-based debugging.
-          const err = chrome.runtime.lastError;
-          if (err) {
-            const msg = err.message || "";
-            if (msg.indexOf("Could not establish connection") !== -1) {
-              renderMessage("error", "Reload the LinkedIn tab to see diagnostics");
-            } else {
-              console.warn("[Sift] diag sendMessage error:", msg);
-              renderMessage("error", "Diagnostics unavailable — check the console");
+        chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
+          const tab = tabs && tabs[0];
+          if (!tab || !tab.url || !tab.url.includes("linkedin.com")) {
+            renderMessage("empty", "Open LinkedIn to see what Sift detects");
+            return;
+          }
+          chrome.tabs.sendMessage(tab.id, { type: "SIFT_DIAG" }, function (diag) {
+            // Distinguish error modes so the message we show actually maps to
+            // the root cause. Three distinct cases:
+            //   1. "Could not establish connection" — content script not loaded
+            //      on this tab. Reload advice is correct.
+            //   2. Any other lastError (e.g. "port closed before response")
+            //      — content script likely threw mid-response. Reload won't
+            //      help; point the user at the console.
+            //   3. Listener returned an `error` field — collectDiagnostics
+            //      caught an exception. Same: console-based debugging.
+            const err = chrome.runtime.lastError;
+            if (err) {
+              const msg = err.message || "";
+              if (msg.indexOf("Could not establish connection") !== -1) {
+                renderMessage("error", "Reload the LinkedIn tab to see diagnostics");
+              } else {
+                console.warn("[Sift] diag sendMessage error:", msg);
+                renderMessage("error", "Diagnostics unavailable — check the console");
+              }
+              return;
             }
-            return;
-          }
-          if (!diag) {
-            console.warn("[Sift] diag response was empty");
-            renderMessage("error", "Diagnostics unavailable — check the console");
-            return;
-          }
-          if (diag.error) {
-            console.warn("[Sift] content-script diag threw:", diag.error);
-            renderMessage("error", "Diagnostics error: " + diag.error);
-            return;
-          }
-          renderDiag(diag);
+            if (!diag) {
+              console.warn("[Sift] diag response was empty");
+              renderMessage("error", "Diagnostics unavailable — check the console");
+              return;
+            }
+            if (diag.error) {
+              console.warn("[Sift] content-script diag threw:", diag.error);
+              renderMessage("error", "Diagnostics error: " + diag.error);
+              return;
+            }
+            renderDiag(diag, currentSettings);
+          });
         });
       });
     }
@@ -505,6 +528,13 @@ import {
     // Match mode dropdown — controls how each keyword is compared against
     // post text. "Whole word" is the new default; existing users were
     // migrated to "Substring" by schema v1→v2 to preserve behavior.
+    // Values come from FEED_KEYWORD_MATCH_MODES (single source of truth);
+    // labels are mapped here since they're UI-only.
+    const MATCH_MODE_LABELS = {
+      wholeWord: "Whole word",
+      substring: "Substring",
+      regex: "Regex",
+    };
     let kwModeRow = document.createElement("div");
     kwModeRow.className = "toggle-row";
     let kwModeLabel = document.createElement("span");
@@ -516,15 +546,11 @@ import {
       "Whole word: matches whole words only (avoids 'ai' matching 'training').\n" +
       "Substring: matches any text (legacy default).\n" +
       "Regex: each keyword is a regex pattern.";
-    [
-      { value: "wholeWord", label: "Whole word" },
-      { value: "substring", label: "Substring" },
-      { value: "regex", label: "Regex" },
-    ].forEach(function (opt) {
+    FEED_KEYWORD_MATCH_MODES.forEach(function (value) {
       let option = document.createElement("option");
-      option.value = opt.value;
-      option.textContent = opt.label;
-      if ((settings.feedKeywordMatchMode || "substring") === opt.value) {
+      option.value = value;
+      option.textContent = MATCH_MODE_LABELS[value] || value;
+      if ((settings.feedKeywordMatchMode || "substring") === value) {
         option.selected = true;
       }
       kwModeSelect.appendChild(option);
@@ -547,9 +573,8 @@ import {
       if (e.key === "Enter") addFeedKeywords();
     });
     let kwAddBtn = document.createElement("button");
-    kwAddBtn.className = "list-item-remove";
+    kwAddBtn.className = "list-add-btn";
     kwAddBtn.textContent = "+";
-    kwAddBtn.style.cssText = "font-size:16px;cursor:pointer;background:none;border:none;color:#D9797B;font-weight:bold;";
     kwAddBtn.addEventListener("click", addFeedKeywords);
     kwAddRow.appendChild(kwInput);
     kwAddRow.appendChild(kwAddBtn);
@@ -714,10 +739,8 @@ import {
     companyAddInput.placeholder = "Add companies (comma-separated)…";
     companyAddInput.className = "list-search-input";
     let companyAddBtn = document.createElement("button");
-    companyAddBtn.className = "list-item-remove";
+    companyAddBtn.className = "list-add-btn";
     companyAddBtn.textContent = "+";
-    companyAddBtn.style.cssText =
-      "font-size:16px;cursor:pointer;background:none;border:none;color:#D9797B;font-weight:bold;";
     companyAddRow.appendChild(companyAddInput);
     companyAddRow.appendChild(companyAddBtn);
     jobsLists.appendChild(companyAddRow);
@@ -753,10 +776,8 @@ import {
     titleAddInput.placeholder = "Add title keywords (comma-separated)…";
     titleAddInput.className = "list-search-input";
     let titleAddBtn = document.createElement("button");
-    titleAddBtn.className = "list-item-remove";
+    titleAddBtn.className = "list-add-btn";
     titleAddBtn.textContent = "+";
-    titleAddBtn.style.cssText =
-      "font-size:16px;cursor:pointer;background:none;border:none;color:#D9797B;font-weight:bold;";
     titleAddRow.appendChild(titleAddInput);
     titleAddRow.appendChild(titleAddBtn);
     jobsLists.appendChild(titleAddRow);

@@ -79,10 +79,18 @@ describe("matchesFeedKeyword", () => {
       expect(matchesFeedKeyword("That was a fail", ["ai"], "wholeWord")).toBeNull();
     });
 
-    it("falls back to substring for keywords with no word-char ends", () => {
-      // "++" has no word chars on either side — `\b` wouldn't apply, so we
-      // fall back to substring matching for that keyword.
+    it("matches non-word-edge keywords surrounded by non-word chars", () => {
+      // "++" sits between space and end-of-string — both non-word edges.
+      // matchesWholeWord uses (?<!\w)…(?!\w) so this matches cleanly.
       expect(matchesFeedKeyword("score: ++", ["++"], "wholeWord")).toBe("++");
+    });
+
+    it("excludes non-word-edge keywords adjacent to word chars (stricter than substring)", () => {
+      // Critical regression marker: an earlier wholeWord implementation
+      // had a substring FALLBACK for non-word-edge keywords, which would
+      // have wrongly matched "abc++d". matchesWholeWord's
+      // (?<!\w)…(?!\w) correctly excludes this case.
+      expect(matchesFeedKeyword("abc++d", ["++"], "wholeWord")).toBeNull();
     });
 
     it("handles keywords starting with a non-word char (e.g. hashtags)", () => {

@@ -4,6 +4,10 @@
     // Storage schema version — bumped via src/shared/schema.js#migrate when
     // the shape of stored data changes. New installs start at the latest.
     schemaVersion: 2,
+    // Global master toggle. When true, all filtering / hiding / dimming is
+    // suspended across feed, profile, network, and jobs pages. Diagnostic
+    // counts still flow so the user can see what Sift WOULD hide if unpaused.
+    siftPaused: false,
     // Feed page
     hidePromoted: true,
     hideSuggested: true,

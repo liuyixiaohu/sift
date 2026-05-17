@@ -4,6 +4,10 @@
     // Storage schema version — bumped via src/shared/schema.js#migrate when
     // the shape of stored data changes. New installs start at the latest.
     schemaVersion: 2,
+    // Global master toggle. When true, all filtering / hiding / dimming is
+    // suspended across feed, profile, network, and jobs pages. Diagnostic
+    // counts still flow so the user can see what Sift WOULD hide if unpaused.
+    siftPaused: false,
     // Feed page
     hidePromoted: true,
     hideSuggested: true,
@@ -89,6 +93,8 @@
   var SCHEMA_TYPES = {
     // Schema version itself
     schemaVersion: "number",
+    // Global master toggle
+    siftPaused: "boolean",
     // Feed-page toggles
     hidePromoted: "boolean",
     hideSuggested: "boolean",
@@ -425,6 +431,7 @@
       }
       function renderDiag(diag) {
         wrap.dataset.state = "ok";
+        wrap.dataset.paused = diag.paused ? "true" : "false";
         body.innerHTML = "";
         const pill = document.createElement("span");
         pill.className = "diag-page";
@@ -475,9 +482,40 @@
       refreshBtn.addEventListener("click", refresh);
       refresh();
     }
+    function buildPauseRow(container, paused) {
+      const wrap = document.createElement("div");
+      wrap.className = "pause-row";
+      wrap.dataset.paused = paused ? "true" : "false";
+      const label = document.createElement("span");
+      label.className = "pause-label";
+      label.textContent = paused ? "Sift is paused" : "Sift is active";
+      const sub = document.createElement("span");
+      sub.className = "pause-sub";
+      sub.textContent = paused ? "All filtering suspended." : "Filtering across feed, profile, jobs.";
+      const text = document.createElement("div");
+      text.className = "pause-text";
+      text.appendChild(label);
+      text.appendChild(sub);
+      const switchLabel = document.createElement("label");
+      switchLabel.className = "toggle-switch";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.checked = !paused;
+      input.addEventListener("change", function() {
+        chrome.storage.local.set({ siftPaused: !input.checked });
+      });
+      const slider = document.createElement("span");
+      slider.className = "toggle-slider";
+      switchLabel.appendChild(input);
+      switchLabel.appendChild(slider);
+      wrap.appendChild(text);
+      wrap.appendChild(switchLabel);
+      container.appendChild(wrap);
+    }
     function buildControlsTab(settings) {
       let container = document.getElementById("tab-controls");
       container.innerHTML = "";
+      buildPauseRow(container, !!settings.siftPaused);
       buildDiagnosticPanel(container);
       let feedGroup = document.createElement("div");
       feedGroup.className = "section-group";
@@ -668,6 +706,35 @@
         );
       });
       const jobsLists = createSubGroup(jobsGroup, "Skip lists");
+      function addToList(rawText, list, storageKey, render, itemNoun) {
+        const incoming = rawText.split(/[,\n]+/).map(function(s) {
+          return s.trim();
+        }).filter(Boolean);
+        let added = 0;
+        incoming.forEach(function(item) {
+          if (addUnique(list, item)) added++;
+        });
+        if (added > 0) {
+          var obj = {};
+          obj[storageKey] = list;
+          chrome.storage.local.set(obj);
+          render(list);
+          showToast(added + " " + itemNoun + (added > 1 ? "s" : "") + " added");
+        }
+      }
+      let companyAddRow = document.createElement("div");
+      companyAddRow.className = "list-search-row";
+      let companyAddInput = document.createElement("input");
+      companyAddInput.type = "text";
+      companyAddInput.placeholder = "Add companies (comma-separated)\u2026";
+      companyAddInput.className = "list-search-input";
+      let companyAddBtn = document.createElement("button");
+      companyAddBtn.className = "list-item-remove";
+      companyAddBtn.textContent = "+";
+      companyAddBtn.style.cssText = "font-size:16px;cursor:pointer;background:none;border:none;color:#D9797B;font-weight:bold;";
+      companyAddRow.appendChild(companyAddInput);
+      companyAddRow.appendChild(companyAddBtn);
+      jobsLists.appendChild(companyAddRow);
       let renderCompanies = createListSection(
         jobsLists,
         "Skipped Companies",
@@ -679,6 +746,29 @@
         }
       );
       renderCompanies(settings.skippedCompanies);
+      function submitCompanyAdd() {
+        const val = companyAddInput.value.trim();
+        if (!val) return;
+        addToList(val, settings.skippedCompanies, "skippedCompanies", renderCompanies, "company");
+        companyAddInput.value = "";
+      }
+      companyAddBtn.addEventListener("click", submitCompanyAdd);
+      companyAddInput.addEventListener("keydown", function(e) {
+        if (e.key === "Enter") submitCompanyAdd();
+      });
+      let titleAddRow = document.createElement("div");
+      titleAddRow.className = "list-search-row";
+      let titleAddInput = document.createElement("input");
+      titleAddInput.type = "text";
+      titleAddInput.placeholder = "Add title keywords (comma-separated)\u2026";
+      titleAddInput.className = "list-search-input";
+      let titleAddBtn = document.createElement("button");
+      titleAddBtn.className = "list-item-remove";
+      titleAddBtn.textContent = "+";
+      titleAddBtn.style.cssText = "font-size:16px;cursor:pointer;background:none;border:none;color:#D9797B;font-weight:bold;";
+      titleAddRow.appendChild(titleAddInput);
+      titleAddRow.appendChild(titleAddBtn);
+      jobsLists.appendChild(titleAddRow);
       let renderTitleKw = createListSection(
         jobsLists,
         "Skipped Title Keywords",
@@ -690,6 +780,22 @@
         }
       );
       renderTitleKw(settings.skippedTitleKeywords);
+      function submitTitleKwAdd() {
+        const val = titleAddInput.value.trim();
+        if (!val) return;
+        addToList(
+          val,
+          settings.skippedTitleKeywords,
+          "skippedTitleKeywords",
+          renderTitleKw,
+          "keyword"
+        );
+        titleAddInput.value = "";
+      }
+      titleAddBtn.addEventListener("click", submitTitleKwAdd);
+      titleAddInput.addEventListener("keydown", function(e) {
+        if (e.key === "Enter") submitTitleKwAdd();
+      });
       container.appendChild(jobsGroup);
     }
     function getTodayString() {

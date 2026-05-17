@@ -167,6 +167,14 @@ body.lj-hide-old-posts [data-lj-too-old="true"] {
   box-shadow: 0 2px 12px rgba(0,0,0,0.12);
 }
 
+/* Muted look when Sift is globally paused — same badge position, lower
+ * visual weight so the user can see filtering is off without it being
+ * an alarm. */
+#lj-mini-badge[data-paused="true"] {
+  opacity: 0.65;
+  background: rgba(228, 221, 210, 0.92);
+}
+
 /* Badge breakdown tooltip */
 #lj-badge-tip {
   position: fixed;

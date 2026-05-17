@@ -320,7 +320,19 @@ export function skipCurrentCompany() {
   saveValue("skippedCompanies", state.skippedCompanies);
   renderLists();
   refilterAll();
-  showToast("Skipped: " + name);
+  // Undo path: remove the just-added entry by identity (last occurrence of
+  // the exact name we pushed). If the user has added more entries since,
+  // we still only remove THIS one — splice on the last matching index.
+  showToast("Skipped: " + name, {
+    undo: () => {
+      const idx = state.skippedCompanies.lastIndexOf(name);
+      if (idx === -1) return;
+      state.skippedCompanies.splice(idx, 1);
+      saveValue("skippedCompanies", state.skippedCompanies);
+      renderLists();
+      refilterAll();
+    },
+  });
 }
 
 // ==================== Render Skip Lists ====================

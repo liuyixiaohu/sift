@@ -4,6 +4,10 @@
     // Storage schema version — bumped via src/shared/schema.js#migrate when
     // the shape of stored data changes. New installs start at the latest.
     schemaVersion: 2,
+    // Global master toggle. When true, all filtering / hiding / dimming is
+    // suspended across feed, profile, network, and jobs pages. Diagnostic
+    // counts still flow so the user can see what Sift WOULD hide if unpaused.
+    siftPaused: false,
     // Feed page
     hidePromoted: true,
     hideSuggested: true,
@@ -416,8 +420,16 @@
     }, updateBadgeCount = function() {
       const badge = feedDoc.getElementById("lj-mini-badge");
       if (!badge) return;
-      const count = feedDoc.querySelectorAll('[data-lj-promoted="true"], [data-lj-suggested="true"], [data-lj-recommended="true"], [data-lj-non-connection="true"], [data-lj-poll="true"], [data-lj-celebration="true"], [data-lj-keyword-filtered="true"], [data-lj-too-old="true"]').length;
-      badge.textContent = count > 0 ? "\u{1F50D} " + count + " filtered" : "\u{1F50D} Sift";
+      if (settings.siftPaused) {
+        badge.dataset.paused = "true";
+        badge.textContent = "\u{1F50D} Sift paused";
+      } else {
+        delete badge.dataset.paused;
+        const count = feedDoc.querySelectorAll(
+          '[data-lj-promoted="true"], [data-lj-suggested="true"], [data-lj-recommended="true"], [data-lj-non-connection="true"], [data-lj-poll="true"], [data-lj-celebration="true"], [data-lj-keyword-filtered="true"], [data-lj-too-old="true"]'
+        ).length;
+        badge.textContent = count > 0 ? "\u{1F50D} " + count + " filtered" : "\u{1F50D} Sift";
+      }
       const tip = feedDoc.getElementById("lj-badge-tip");
       if (tip && tip.classList.contains("visible")) updateBreakdown();
     }, findNoiseWrapper = function(headingEl) {
@@ -462,10 +474,15 @@
         }
       });
     }, applyProfileClasses = function() {
-      document.body.classList.toggle("lj-hide-profile-analytics", settings.hideProfileAnalytics);
+      const active = !settings.siftPaused;
+      document.body.classList.toggle("lj-sift-paused", settings.siftPaused);
+      document.body.classList.toggle(
+        "lj-hide-profile-analytics",
+        active && settings.hideProfileAnalytics
+      );
       document.body.classList.toggle(
         "lj-hide-profile-suggestions",
-        settings.hideProfileSuggestions
+        active && settings.hideProfileSuggestions
       );
       markProfileNoise();
     }, bootProfile = function() {
@@ -486,12 +503,16 @@
       );
       if (profileNoiseRetryTimer) clearTimeout(profileNoiseRetryTimer);
     }, hideNetworkAds = function() {
-      const adIframe = document.querySelector('iframe[src="about:blank"]');
-      if (adIframe) {
-        const adCard = adIframe.parentElement?.parentElement;
-        if (adCard && adCard.offsetWidth < 400) adCard.style.display = "none";
+      const active = !settings.siftPaused;
+      if (active) {
+        const adIframe = document.querySelector('iframe[src="about:blank"]');
+        if (adIframe) {
+          const adCard = adIframe.parentElement?.parentElement;
+          if (adCard && adCard.offsetWidth < 400) adCard.style.display = "none";
+        }
       }
-      document.body.classList.toggle("lj-hide-network-game", settings.hidePromoted);
+      document.body.classList.toggle("lj-sift-paused", settings.siftPaused);
+      document.body.classList.toggle("lj-hide-network-game", active && settings.hidePromoted);
     }, bootNetwork = function() {
       if (networkInitialized) return;
       networkInitialized = true;
@@ -508,17 +529,25 @@
       networkInitialized = false;
       document.body.classList.remove("lj-hide-network-game");
     }, applyBodyClasses = function() {
-      feedDoc.body.classList.toggle("lj-hide-promoted", settings.hidePromoted);
-      feedDoc.body.classList.toggle("lj-hide-suggested", settings.hideSuggested);
-      feedDoc.body.classList.toggle("lj-hide-recommended", settings.hideRecommended);
-      feedDoc.body.classList.toggle("lj-hide-non-connections", settings.hideNonConnections);
-      feedDoc.body.classList.toggle("lj-hide-polls", settings.hidePolls);
-      feedDoc.body.classList.toggle("lj-hide-celebrations", settings.hideCelebrations);
-      feedDoc.body.classList.toggle("lj-hide-keyword-filtered", settings.feedKeywordFilterEnabled);
-      feedDoc.body.classList.toggle("lj-hide-old-posts", settings.postAgeLimit > 0);
+      const active = !settings.siftPaused;
+      feedDoc.body.classList.toggle("lj-sift-paused", settings.siftPaused);
+      feedDoc.body.classList.toggle("lj-hide-promoted", active && settings.hidePromoted);
+      feedDoc.body.classList.toggle("lj-hide-suggested", active && settings.hideSuggested);
+      feedDoc.body.classList.toggle("lj-hide-recommended", active && settings.hideRecommended);
+      feedDoc.body.classList.toggle(
+        "lj-hide-non-connections",
+        active && settings.hideNonConnections
+      );
+      feedDoc.body.classList.toggle("lj-hide-polls", active && settings.hidePolls);
+      feedDoc.body.classList.toggle("lj-hide-celebrations", active && settings.hideCelebrations);
+      feedDoc.body.classList.toggle(
+        "lj-hide-keyword-filtered",
+        active && settings.feedKeywordFilterEnabled
+      );
+      feedDoc.body.classList.toggle("lj-hide-old-posts", active && settings.postAgeLimit > 0);
       feedDoc.body.classList.toggle(
         "lj-hide-profile-suggestions",
-        settings.hideProfileSuggestions
+        active && settings.hideProfileSuggestions
       );
     }, detectPageType = function() {
       if (isFeedPage()) return "feed";
@@ -532,6 +561,7 @@
       return {
         url: location.href,
         pageType: detectPageType(),
+        paused: !!settings.siftPaused,
         feed: {
           promoted: feedQ('[data-lj-promoted="true"]'),
           suggested: feedQ('[data-lj-suggested="true"]'),
@@ -654,7 +684,7 @@
     let initialized = false;
     let feedDoc = document;
     const DEFAULTS = SIFT_DEFAULTS;
-    const SETTING_KEYS = /* @__PURE__ */ new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywordMatchMode", "feedKeywords", "postAgeLimit", "hideProfileAnalytics", "hideProfileSuggestions"]);
+    const SETTING_KEYS = /* @__PURE__ */ new Set(["siftPaused", "hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywordMatchMode", "feedKeywords", "postAgeLimit", "hideProfileAnalytics", "hideProfileSuggestions"]);
     let settings = { ...DEFAULTS };
     const POST_TYPE_LABELS = /* @__PURE__ */ new Set([
       "Promoted",

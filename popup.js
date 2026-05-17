@@ -352,9 +352,122 @@
       }
       return render;
     }
+    const DIAG_PAGE_LABELS = {
+      feed: "Feed",
+      profile: "Profile",
+      jobs: "Jobs",
+      network: "Network",
+      other: "Other"
+    };
+    function relevantCountsFor(diag) {
+      const items = [];
+      const push = (label, n) => {
+        if (n > 0) items.push({ label, n });
+      };
+      if (diag.pageType === "feed") {
+        push("Ads", diag.feed.promoted);
+        push("Suggested", diag.feed.suggested);
+        push("Recommended", diag.feed.recommended);
+        push("Strangers", diag.feed.nonConnection);
+        push("Polls", diag.feed.poll);
+        push("Celebrations", diag.feed.celebration);
+        push("Keywords", diag.feed.keywordFiltered);
+        push("Too old", diag.feed.tooOld);
+        push("Sidebar widgets", diag.profile.noise);
+      } else if (diag.pageType === "profile") {
+        push("Analytics", diag.profile.analytics);
+        push("Suggestion widgets", diag.profile.noise);
+      } else if (diag.pageType === "jobs") {
+        push("Flagged jobs", diag.jobs.flagged);
+      } else if (diag.pageType === "network") {
+        push("Hidden widgets", diag.profile.noise);
+      }
+      return items;
+    }
+    function buildDiagnosticPanel(container) {
+      const wrap = document.createElement("div");
+      wrap.className = "diag-panel";
+      wrap.dataset.state = "loading";
+      const titleRow = document.createElement("div");
+      titleRow.className = "diag-title-row";
+      const title = document.createElement("span");
+      title.className = "diag-title";
+      title.textContent = "On this page";
+      const refreshBtn = document.createElement("button");
+      refreshBtn.className = "diag-refresh";
+      refreshBtn.textContent = "\u21BB";
+      refreshBtn.title = "Refresh";
+      titleRow.appendChild(title);
+      titleRow.appendChild(refreshBtn);
+      wrap.appendChild(titleRow);
+      const body = document.createElement("div");
+      body.className = "diag-body";
+      wrap.appendChild(body);
+      container.appendChild(wrap);
+      function renderMessage(state, text) {
+        wrap.dataset.state = state;
+        body.innerHTML = "";
+        const msg = document.createElement("span");
+        msg.className = "diag-message";
+        msg.textContent = text;
+        body.appendChild(msg);
+      }
+      function renderDiag(diag) {
+        wrap.dataset.state = "ok";
+        body.innerHTML = "";
+        const pill = document.createElement("span");
+        pill.className = "diag-page";
+        pill.textContent = DIAG_PAGE_LABELS[diag.pageType] || diag.pageType;
+        body.appendChild(pill);
+        const items = relevantCountsFor(diag);
+        if (items.length === 0) {
+          const none = document.createElement("span");
+          none.className = "diag-message";
+          none.textContent = " \xB7 nothing detected yet";
+          body.appendChild(none);
+          return;
+        }
+        const sep = document.createElement("span");
+        sep.className = "diag-sep";
+        sep.textContent = " \xB7 ";
+        body.appendChild(sep);
+        items.forEach(function(item, i) {
+          const chip = document.createElement("span");
+          chip.className = "diag-chip";
+          chip.textContent = item.n + " " + item.label;
+          body.appendChild(chip);
+          if (i < items.length - 1) {
+            const comma = document.createElement("span");
+            comma.className = "diag-sep";
+            comma.textContent = ", ";
+            body.appendChild(comma);
+          }
+        });
+      }
+      function refresh() {
+        renderMessage("loading", "Loading\u2026");
+        chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+          const tab = tabs && tabs[0];
+          if (!tab || !tab.url || !tab.url.includes("linkedin.com")) {
+            renderMessage("empty", "Open LinkedIn to see what Sift detects");
+            return;
+          }
+          chrome.tabs.sendMessage(tab.id, { type: "SIFT_DIAG" }, function(diag) {
+            if (chrome.runtime.lastError || !diag) {
+              renderMessage("error", "Reload the LinkedIn tab to see diagnostics");
+              return;
+            }
+            renderDiag(diag);
+          });
+        });
+      }
+      refreshBtn.addEventListener("click", refresh);
+      refresh();
+    }
     function buildControlsTab(settings) {
       let container = document.getElementById("tab-controls");
       container.innerHTML = "";
+      buildDiagnosticPanel(container);
       let feedGroup = document.createElement("div");
       feedGroup.className = "section-group";
       let feedTitle = document.createElement("div");

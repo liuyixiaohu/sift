@@ -9,7 +9,6 @@
     hideSuggested: true,
     hideRecommended: true,
     hideNonConnections: false,
-    hideSidebar: true,
     hidePolls: false,
     hideCelebrations: false,
     feedKeywordFilterEnabled: true,
@@ -412,7 +411,6 @@
         }
       });
     }, applyProfileClasses = function() {
-      document.body.classList.toggle("lj-hide-sidebar", settings.hideSidebar);
       document.body.classList.toggle("lj-hide-profile-analytics", settings.hideProfileAnalytics);
       document.body.classList.toggle(
         "lj-hide-profile-suggestions",
@@ -432,7 +430,6 @@
       if (!profileInitialized) return;
       profileInitialized = false;
       document.body.classList.remove(
-        "lj-hide-sidebar",
         "lj-hide-profile-analytics",
         "lj-hide-profile-suggestions"
       );
@@ -464,7 +461,6 @@
       feedDoc.body.classList.toggle("lj-hide-suggested", settings.hideSuggested);
       feedDoc.body.classList.toggle("lj-hide-recommended", settings.hideRecommended);
       feedDoc.body.classList.toggle("lj-hide-non-connections", settings.hideNonConnections);
-      feedDoc.body.classList.toggle("lj-hide-sidebar", settings.hideSidebar);
       feedDoc.body.classList.toggle("lj-hide-polls", settings.hidePolls);
       feedDoc.body.classList.toggle("lj-hide-celebrations", settings.hideCelebrations);
       feedDoc.body.classList.toggle("lj-hide-keyword-filtered", settings.feedKeywordFilterEnabled);
@@ -473,34 +469,6 @@
         "lj-hide-profile-suggestions",
         settings.hideProfileSuggestions
       );
-    }, hideSidebarElements = function() {
-      feedDoc.querySelectorAll(SIDEBAR_SELECTOR_ALL).forEach((node) => {
-        node.style.display = "none";
-      });
-    }, enforceSidebarHidden = function() {
-      if (sidebarInterval) clearInterval(sidebarInterval);
-      hideSidebarElements();
-      let ticks = 0;
-      sidebarInterval = setInterval(() => {
-        hideSidebarElements();
-        if (++ticks >= SIDEBAR_POLL_MAX_TICKS) clearInterval(sidebarInterval);
-      }, SIDEBAR_POLL_INTERVAL_MS);
-    }, injectSidebarStyle = function() {
-      if (feedDoc.getElementById("lj-sidebar-style")) return;
-      const s = feedDoc.createElement("style");
-      s.id = "lj-sidebar-style";
-      s.textContent = SIDEBAR_SELECTOR_ALL + "{display:none!important}";
-      feedDoc.head.appendChild(s);
-    }, cleanupSidebarOverrides = function() {
-      if (sidebarInterval) {
-        clearInterval(sidebarInterval);
-        sidebarInterval = null;
-      }
-      const injected = feedDoc.getElementById("lj-sidebar-style");
-      if (injected) injected.remove();
-      feedDoc.querySelectorAll(SIDEBAR_SELECTOR_ALL).forEach((node) => {
-        node.style.removeProperty("display");
-      });
     }, injectFeedCssIntoIframe = function() {
       if (feedDoc === document) return;
       if (feedDoc.getElementById("lj-feed-css")) return;
@@ -520,10 +488,6 @@
       updateFeedDoc();
       injectFeedCssIntoIframe();
       applyBodyClasses();
-      if (settings.hideSidebar) {
-        injectSidebarStyle();
-        enforceSidebarHidden();
-      }
       createMiniBadge();
     }, applyFeed = function() {
       scanPosts();
@@ -591,7 +555,6 @@
       } else {
         initialized = false;
         feedDoc = document;
-        if (sidebarInterval) clearInterval(sidebarInterval);
         if (iframeCheckInterval) clearInterval(iframeCheckInterval);
         if (scanInterval) {
           clearInterval(scanInterval);
@@ -603,8 +566,6 @@
     const MIN_FEED_IFRAME_WIDTH = 500;
     const IFRAME_POLL_INTERVAL_MS = 1e3;
     const IFRAME_POLL_MAX_TICKS = 20;
-    const SIDEBAR_POLL_INTERVAL_MS = 2e3;
-    const SIDEBAR_POLL_MAX_TICKS = 15;
     const SPA_POLL_INTERVAL_MS = 3e3;
     const UNFOLLOW_CHECK_INTERVAL_MS = 500;
     const UNFOLLOW_MAX_CHECKS = 20;
@@ -612,7 +573,7 @@
     let initialized = false;
     let feedDoc = document;
     const DEFAULTS = SIFT_DEFAULTS;
-    const SETTING_KEYS = /* @__PURE__ */ new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywords", "postAgeLimit", "hideProfileAnalytics", "hideProfileSuggestions"]);
+    const SETTING_KEYS = /* @__PURE__ */ new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywords", "postAgeLimit", "hideProfileAnalytics", "hideProfileSuggestions"]);
     let settings = { ...DEFAULTS };
     const POST_TYPE_LABELS = /* @__PURE__ */ new Set([
       "Promoted",
@@ -667,24 +628,14 @@
       if ("postAgeLimit" in changes) {
         clearPostMarks("ljAgeChecked", "ljTooOld");
       }
-      loadSettings((s) => {
+      loadSettings(() => {
         if (profileInitialized) applyProfileClasses();
         if (networkInitialized) hideNetworkAds();
         applyBodyClasses();
-        if (s.hideSidebar) enforceSidebarHidden();
-        else cleanupSidebarOverrides();
         scanPosts();
         updateBadgeCount();
       });
     });
-    const SIDEBAR_SELECTORS = [
-      'aside[aria-label="LinkedIn News"]',
-      '[role="complementary"][aria-label="LinkedIn News"]',
-      'footer[aria-label="LinkedIn Footer Content"]',
-      '[role="contentinfo"][aria-label="LinkedIn Footer Content"]'
-    ];
-    const SIDEBAR_SELECTOR_ALL = SIDEBAR_SELECTORS.join(",");
-    let sidebarInterval = null;
     let booting = false;
     const SCAN_INTERVAL_MS = 1500;
     let scanInterval = null;

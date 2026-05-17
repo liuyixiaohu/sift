@@ -99,6 +99,20 @@ import {
 
   const LIST_COLLAPSE_THRESHOLD = 5;
 
+  // === Helper: create sub-group within a page section ===
+  // Lets us cluster related controls inside a Feed / Jobs section without
+  // splitting the page section itself. Returns the inner element to append to.
+  function createSubGroup(parent, label) {
+    const wrap = document.createElement("div");
+    wrap.className = "sub-group";
+    const heading = document.createElement("div");
+    heading.className = "sub-group-title";
+    heading.textContent = label;
+    wrap.appendChild(heading);
+    parent.appendChild(wrap);
+    return wrap;
+  }
+
   function createListSection(container, label, items, onRemove) {
     let section = document.createElement("div");
     section.className = "list-section";
@@ -230,39 +244,44 @@ import {
     feedTitle.textContent = "Feed Page";
     feedGroup.appendChild(feedTitle);
 
-    // Feed toggles — each maps a display label to a storage key
-    var feedToggles = [
-      ["Hide Ads", "hidePromoted"],
-      ["Hide Suggested", "hideSuggested"],
-      ["Hide Recommended", "hideRecommended"],
-      ["Hide Strangers", "hideNonConnections"],
-      ["Hide Sidebar", "hideSidebar"],
-      ["Hide Polls", "hidePolls"],
-      ["Hide Celebrations", "hideCelebrations"],
+    // Sub-group: post types (ordered by frequency of use — most-used at top)
+    const feedTypes = createSubGroup(feedGroup, "Hide post types");
+    const postTypeToggles = [
+      ["Ads", "hidePromoted"],
+      ["Suggested posts", "hideSuggested"],
+      ["Recommended posts", "hideRecommended"],
+      ["Strangers (non-1st)", "hideNonConnections"],
+      ["Polls", "hidePolls"],
+      ["Celebrations", "hideCelebrations"],
     ];
-    feedToggles.forEach(function (pair) {
-      feedGroup.appendChild(createToggle(pair[0], settings[pair[1]], function (v) {
-        var obj = {};
-        obj[pair[1]] = v;
-        chrome.storage.local.set(obj);
-      }));
+    postTypeToggles.forEach(function (pair) {
+      feedTypes.appendChild(
+        createToggle(pair[0], settings[pair[1]], function (v) {
+          var obj = {};
+          obj[pair[1]] = v;
+          chrome.storage.local.set(obj);
+        })
+      );
     });
+
+    // Sub-group: filter by rule (age dropdown + keyword filter)
+    const feedRules = createSubGroup(feedGroup, "Filter by rule");
 
     // Post age filter
     let ageRow = document.createElement("div");
     ageRow.className = "toggle-row";
     let ageLabel = document.createElement("span");
     ageLabel.className = "toggle-label";
-    ageLabel.textContent = "Hide Old Posts";
+    ageLabel.textContent = "Hide posts older than";
     let ageSelect = document.createElement("select");
     ageSelect.className = "age-select";
     [
       { value: 0, label: "Off" },
-      { value: 1, label: "> 1 day" },
-      { value: 3, label: "> 3 days" },
-      { value: 7, label: "> 1 week" },
-      { value: 14, label: "> 2 weeks" },
-      { value: 30, label: "> 1 month" },
+      { value: 1, label: "1 day" },
+      { value: 3, label: "3 days" },
+      { value: 7, label: "1 week" },
+      { value: 14, label: "2 weeks" },
+      { value: 30, label: "1 month" },
     ].forEach(function (opt) {
       let option = document.createElement("option");
       option.value = opt.value;
@@ -275,12 +294,14 @@ import {
     });
     ageRow.appendChild(ageLabel);
     ageRow.appendChild(ageSelect);
-    feedGroup.appendChild(ageRow);
+    feedRules.appendChild(ageRow);
 
     // Feed Keyword Filter
-    feedGroup.appendChild(createToggle("Hide by Keywords", settings.feedKeywordFilterEnabled, function (v) {
-      chrome.storage.local.set({ feedKeywordFilterEnabled: v });
-    }));
+    feedRules.appendChild(
+      createToggle("Filter by keywords", settings.feedKeywordFilterEnabled, function (v) {
+        chrome.storage.local.set({ feedKeywordFilterEnabled: v });
+      })
+    );
 
     // Keyword add input
     let kwAddRow = document.createElement("div");
@@ -299,10 +320,10 @@ import {
     kwAddBtn.addEventListener("click", addFeedKeywords);
     kwAddRow.appendChild(kwInput);
     kwAddRow.appendChild(kwAddBtn);
-    feedGroup.appendChild(kwAddRow);
+    feedRules.appendChild(kwAddRow);
 
     let renderFeedKw = createListSection(
-      feedGroup,
+      feedRules,
       "Feed Keywords",
       settings.feedKeywords || [],
       function (kw) {
@@ -347,14 +368,14 @@ import {
     profileGroup.appendChild(profileTitle);
 
     profileGroup.appendChild(
-      createToggle("Hide Analytics", settings.hideProfileAnalytics, function (v) {
+      createToggle("Hide Analytics widget", settings.hideProfileAnalytics, function (v) {
         chrome.storage.local.set({ hideProfileAnalytics: v });
       })
     );
 
     profileGroup.appendChild(
       createToggle(
-        "Hide Suggestions & Ads",
+        "Hide suggestions & ads",
         settings.hideProfileSuggestions,
         function (v) {
           chrome.storage.local.set({ hideProfileSuggestions: v });
@@ -372,24 +393,45 @@ import {
     jobsTitle.textContent = "Jobs Page";
     jobsGroup.appendChild(jobsTitle);
 
-    var jobsToggles = [
-      ["Detect No Sponsor", "sponsorCheckEnabled"],
-      ["Detect Unpaid", "unpaidCheckEnabled"],
-      ["Auto-skip Flagged Companies", "autoSkipDetected"],
-      ["Dim Filtered Cards", "dimFiltered"],
-      ["Hide Filtered Cards", "hideFiltered"],
+    // Sub-group: detection (badges added to cards matching these signals)
+    const jobsDetect = createSubGroup(jobsGroup, "Detect & flag");
+    const detectToggles = [
+      ["Flag No Sponsor jobs", "sponsorCheckEnabled"],
+      ["Flag Unpaid jobs", "unpaidCheckEnabled"],
+      ["Auto-skip flagged companies", "autoSkipDetected"],
     ];
-    jobsToggles.forEach(function (pair) {
-      jobsGroup.appendChild(createToggle(pair[0], settings[pair[1]], function (v) {
-        var obj = {};
-        obj[pair[1]] = v;
-        chrome.storage.local.set(obj);
-      }));
+    detectToggles.forEach(function (pair) {
+      jobsDetect.appendChild(
+        createToggle(pair[0], settings[pair[1]], function (v) {
+          var obj = {};
+          obj[pair[1]] = v;
+          chrome.storage.local.set(obj);
+        })
+      );
     });
+
+    // Sub-group: how flagged cards display
+    const jobsDisplay = createSubGroup(jobsGroup, "Display flagged cards");
+    const displayToggles = [
+      ["Dim flagged cards", "dimFiltered"],
+      ["Hide flagged cards", "hideFiltered"],
+    ];
+    displayToggles.forEach(function (pair) {
+      jobsDisplay.appendChild(
+        createToggle(pair[0], settings[pair[1]], function (v) {
+          var obj = {};
+          obj[pair[1]] = v;
+          chrome.storage.local.set(obj);
+        })
+      );
+    });
+
+    // Sub-group: skip lists (user-managed)
+    const jobsLists = createSubGroup(jobsGroup, "Skip lists");
 
     // Skipped Companies list
     let renderCompanies = createListSection(
-      jobsGroup,
+      jobsLists,
       "Skipped Companies",
       settings.skippedCompanies,
       function (company) {
@@ -402,7 +444,7 @@ import {
 
     // Skipped Title Keywords list
     let renderTitleKw = createListSection(
-      jobsGroup,
+      jobsLists,
       "Skipped Title Keywords",
       settings.skippedTitleKeywords,
       function (kw) {

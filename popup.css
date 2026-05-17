@@ -113,6 +113,28 @@ body {
   margin-bottom: 0;
 }
 
+/* Sub-groups nest inside a section-group to cluster related controls. */
+.sub-group {
+  margin-top: 10px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(228, 221, 210, 0.7);
+}
+
+.sub-group:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.sub-group-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A939B;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
 .section-title {
   font-size: 11px;
   font-weight: 600;

@@ -30,7 +30,6 @@ const SCHEMA_TYPES = {
   hideSuggested: "boolean",
   hideRecommended: "boolean",
   hideNonConnections: "boolean",
-  hideSidebar: "boolean",
   hidePolls: "boolean",
   hideCelebrations: "boolean",
   feedKeywordFilterEnabled: "boolean",

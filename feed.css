@@ -1,23 +1,6 @@
 /* === Feed cleanup styles (toggled via body classes) === */
 /* Note: EB Garamond font is loaded via <link> tag in JS, not @import (avoids render blocking) */
 
-/* Hide LinkedIn News sidebar + footer when enabled */
-body.lj-hide-sidebar aside[aria-label="LinkedIn News"],
-body.lj-hide-sidebar [role="complementary"][aria-label="LinkedIn News"],
-body.lj-hide-sidebar footer[aria-label="LinkedIn Footer Content"],
-body.lj-hide-sidebar [role="contentinfo"][aria-label="LinkedIn Footer Content"] {
-  display: none !important;
-}
-/* LinkedIn 2026 DOM: sidebar is the last column in the 3-column grid */
-body.lj-hide-sidebar main > div > div > div:last-child:nth-child(3) {
-  display: none !important;
-}
-
-/* Profile page: hide right sidebar (reuses hideSidebar toggle) */
-body.lj-hide-sidebar aside.scaffold-layout__aside {
-  display: none !important;
-}
-
 /* Profile page: hide Analytics section.
  *
  * LinkedIn's 2026 DOM nests the Analytics section INSIDE the outer profile
@@ -200,7 +183,9 @@ body.lj-hide-old-posts [data-lj-too-old="true"] {
   transform: translateY(0);
 }
 
-/* === Auto-hide sidebar on narrow viewports === */
+/* === Auto-hide right sidebar on narrow viewports (recoverable space) === */
+/* Selectors below targeted older LinkedIn DOM; current renames may have
+ * neutralized them. Kept as a no-op until verified one way or the other. */
 @media (max-width: 1100px) {
   aside[aria-label="LinkedIn News"],
   [role="complementary"][aria-label="LinkedIn News"],

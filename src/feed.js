@@ -10,9 +10,7 @@ if (chrome.runtime?.id) {
   const MIN_FEED_IFRAME_WIDTH = 500;  // px — ignore narrow iframes (ads, widgets)
   const IFRAME_POLL_INTERVAL_MS = 1000;
   const IFRAME_POLL_MAX_TICKS = 20;
-  const SIDEBAR_POLL_INTERVAL_MS = 2000;
-  const SIDEBAR_POLL_MAX_TICKS = 15;
-  const SPA_POLL_INTERVAL_MS = 3000;  // URL fallback poll (primary detection via History API)
+  const SPA_POLL_INTERVAL_MS = 3000; // URL fallback poll (primary detection via History API)
   const UNFOLLOW_CHECK_INTERVAL_MS = 500;
   const UNFOLLOW_MAX_CHECKS = 20;
   const UNFOLLOW_COLLAPSE_DELAY_MS = 1200;
@@ -50,7 +48,7 @@ if (chrome.runtime?.id) {
 
   // === Storage ===
   const DEFAULTS = SIFT_DEFAULTS;
-  const SETTING_KEYS = new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywords", "postAgeLimit", "hideProfileAnalytics", "hideProfileSuggestions"]);
+  const SETTING_KEYS = new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywords", "postAgeLimit", "hideProfileAnalytics", "hideProfileSuggestions"]);
   let settings = { ...DEFAULTS };
 
   function loadSettings(cb) {
@@ -495,7 +493,6 @@ if (chrome.runtime?.id) {
   }
 
   function applyProfileClasses() {
-    document.body.classList.toggle("lj-hide-sidebar", settings.hideSidebar);
     document.body.classList.toggle("lj-hide-profile-analytics", settings.hideProfileAnalytics);
     document.body.classList.toggle(
       "lj-hide-profile-suggestions",
@@ -521,7 +518,6 @@ if (chrome.runtime?.id) {
     if (!profileInitialized) return;
     profileInitialized = false;
     document.body.classList.remove(
-      "lj-hide-sidebar",
       "lj-hide-profile-analytics",
       "lj-hide-profile-suggestions"
     );
@@ -567,7 +563,6 @@ if (chrome.runtime?.id) {
     feedDoc.body.classList.toggle("lj-hide-suggested", settings.hideSuggested);
     feedDoc.body.classList.toggle("lj-hide-recommended", settings.hideRecommended);
     feedDoc.body.classList.toggle("lj-hide-non-connections", settings.hideNonConnections);
-    feedDoc.body.classList.toggle("lj-hide-sidebar", settings.hideSidebar);
     feedDoc.body.classList.toggle("lj-hide-polls", settings.hidePolls);
     feedDoc.body.classList.toggle("lj-hide-celebrations", settings.hideCelebrations);
     feedDoc.body.classList.toggle("lj-hide-keyword-filtered", settings.feedKeywordFilterEnabled);
@@ -592,62 +587,14 @@ if (chrome.runtime?.id) {
     if ("postAgeLimit" in changes) {
       clearPostMarks("ljAgeChecked", "ljTooOld");
     }
-    loadSettings((s) => {
+    loadSettings(() => {
       if (profileInitialized) applyProfileClasses();
       if (networkInitialized) hideNetworkAds();
       applyBodyClasses();
-      if (s.hideSidebar) enforceSidebarHidden();
-      else cleanupSidebarOverrides();
       scanPosts();
       updateBadgeCount();
     });
   });
-
-  // === Sidebar enforcement ===
-  // CSS body class is the primary mechanism; JS polling is the fallback
-  // for async rendering after SPA navigation.
-  const SIDEBAR_SELECTORS = [
-    'aside[aria-label="LinkedIn News"]',
-    '[role="complementary"][aria-label="LinkedIn News"]',
-    'footer[aria-label="LinkedIn Footer Content"]',
-    '[role="contentinfo"][aria-label="LinkedIn Footer Content"]',
-  ];
-  const SIDEBAR_SELECTOR_ALL = SIDEBAR_SELECTORS.join(",");
-  let sidebarInterval = null;
-
-  function hideSidebarElements() {
-    feedDoc.querySelectorAll(SIDEBAR_SELECTOR_ALL).forEach((node) => {
-      node.style.display = "none";
-    });
-  }
-
-  function enforceSidebarHidden() {
-    if (sidebarInterval) clearInterval(sidebarInterval);
-    hideSidebarElements();
-    let ticks = 0;
-    sidebarInterval = setInterval(() => {
-      hideSidebarElements();
-      if (++ticks >= SIDEBAR_POLL_MAX_TICKS) clearInterval(sidebarInterval);
-    }, SIDEBAR_POLL_INTERVAL_MS);
-  }
-
-  function injectSidebarStyle() {
-    if (feedDoc.getElementById("lj-sidebar-style")) return;
-    const s = feedDoc.createElement("style");
-    s.id = "lj-sidebar-style";
-    s.textContent = SIDEBAR_SELECTOR_ALL + "{display:none!important}";
-    feedDoc.head.appendChild(s);
-  }
-
-  // Remove JS-injected sidebar overrides so the CSS toggle can work
-  function cleanupSidebarOverrides() {
-    if (sidebarInterval) { clearInterval(sidebarInterval); sidebarInterval = null; }
-    const injected = feedDoc.getElementById("lj-sidebar-style");
-    if (injected) injected.remove();
-    feedDoc.querySelectorAll(SIDEBAR_SELECTOR_ALL).forEach((node) => {
-      node.style.removeProperty("display");
-    });
-  }
 
   // === Inject feed.css into iframe (extension CSS doesn't load there) ===
   function injectFeedCssIntoIframe() {
@@ -675,7 +622,6 @@ if (chrome.runtime?.id) {
     updateFeedDoc();
     injectFeedCssIntoIframe();
     applyBodyClasses();
-    if (settings.hideSidebar) { injectSidebarStyle(); enforceSidebarHidden(); }
     createMiniBadge();
   }
 
@@ -782,7 +728,6 @@ if (chrome.runtime?.id) {
     } else {
       initialized = false;
       feedDoc = document;
-      if (sidebarInterval) clearInterval(sidebarInterval);
       if (iframeCheckInterval) clearInterval(iframeCheckInterval);
       if (scanInterval) {
         clearInterval(scanInterval);

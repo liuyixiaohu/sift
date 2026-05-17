@@ -46,6 +46,7 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
   // Apply popup setting changes live. Ignore stats/statsAllTime keys to avoid
   // an incrementStat → onChanged → filterJobCards → labelCard → incrementStat loop.
   const SETTING_KEYS = [
+    "siftPaused",
     "skippedCompanies",
     "skippedTitleKeywords",
     "sponsorCheckEnabled",
@@ -60,6 +61,7 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
 
     chrome.storage.local.get(
       {
+        siftPaused: false,
         skippedCompanies: [],
         skippedTitleKeywords: [],
         sponsorCheckEnabled: true,
@@ -69,14 +71,25 @@ if (chrome.runtime?.id && !window.__ljContentLoaded) {
         hideFiltered: false,
       },
       (data) => {
+        const active = !data.siftPaused;
         state.skippedCompanies = data.skippedCompanies;
         state.skippedTitleKeywords = data.skippedTitleKeywords;
         state.sponsorCheckEnabled = data.sponsorCheckEnabled;
         state.unpaidCheckEnabled = data.unpaidCheckEnabled;
         state.autoSkipDetected = data.autoSkipDetected;
-        state.cardsDimmed = data.dimFiltered;
-        state.cardsHidden = data.hideFiltered;
+        // Pause suppresses the visual filter — cards keep their data-lj-reasons
+        // (badges remain) but lj-card-hidden / lj-card-dimmed get cleared on
+        // re-filter below. On unpause, processedCards reset lets cards re-apply.
+        state.cardsDimmed = active && data.dimFiltered;
+        state.cardsHidden = active && data.hideFiltered;
         renderLists();
+        // Pause flipped → drop any existing dim/hide classes; filterJobCards
+        // will re-apply them on unpause based on the updated state flags.
+        if ("siftPaused" in changes) {
+          document
+            .querySelectorAll(".lj-card-hidden, .lj-card-dimmed")
+            .forEach((c) => c.classList.remove("lj-card-hidden", "lj-card-dimmed"));
+        }
         // Reset processed-cards so all cards get re-evaluated with new settings.
         state.processedCards = new WeakSet();
         filterJobCards();

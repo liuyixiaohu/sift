@@ -305,6 +305,7 @@ import {
 
     function renderDiag(diag) {
       wrap.dataset.state = "ok";
+      wrap.dataset.paused = diag.paused ? "true" : "false";
       body.innerHTML = "";
       const pill = document.createElement("span");
       pill.className = "diag-page";
@@ -360,12 +361,55 @@ import {
     refresh();
   }
 
+  // === Master pause toggle ===
+  // Single switch at the top of Controls that suspends all filtering and
+  // hiding across feed, profile, network, and jobs pages. Diagnostic counts
+  // keep flowing so the user can still see what Sift WOULD hide if unpaused.
+  function buildPauseRow(container, paused) {
+    const wrap = document.createElement("div");
+    wrap.className = "pause-row";
+    wrap.dataset.paused = paused ? "true" : "false";
+
+    const label = document.createElement("span");
+    label.className = "pause-label";
+    label.textContent = paused ? "Sift is paused" : "Sift is active";
+
+    const sub = document.createElement("span");
+    sub.className = "pause-sub";
+    sub.textContent = paused
+      ? "All filtering suspended."
+      : "Filtering across feed, profile, jobs.";
+
+    const text = document.createElement("div");
+    text.className = "pause-text";
+    text.appendChild(label);
+    text.appendChild(sub);
+
+    const switchLabel = document.createElement("label");
+    switchLabel.className = "toggle-switch";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = !paused; // ON = active (intuitive direction)
+    input.addEventListener("change", function () {
+      chrome.storage.local.set({ siftPaused: !input.checked });
+    });
+    const slider = document.createElement("span");
+    slider.className = "toggle-slider";
+    switchLabel.appendChild(input);
+    switchLabel.appendChild(slider);
+
+    wrap.appendChild(text);
+    wrap.appendChild(switchLabel);
+    container.appendChild(wrap);
+  }
+
   // === Controls Tab ===
 
   function buildControlsTab(settings) {
     let container = document.getElementById("tab-controls");
     container.innerHTML = "";
 
+    buildPauseRow(container, !!settings.siftPaused);
     buildDiagnosticPanel(container);
 
     // --- Feed Controls ---
@@ -595,7 +639,45 @@ import {
     // Sub-group: skip lists (user-managed)
     const jobsLists = createSubGroup(jobsGroup, "Skip lists");
 
-    // Skipped Companies list
+    // Helper: comma / newline / both-separated input → bulk add with dedup.
+    // Mirrors the jobs-page panel's batchAdd UX so editing from either place
+    // feels the same. Returns added count.
+    function addToList(rawText, list, storageKey, render, itemNoun) {
+      const incoming = rawText
+        .split(/[,\n]+/)
+        .map(function (s) {
+          return s.trim();
+        })
+        .filter(Boolean);
+      let added = 0;
+      incoming.forEach(function (item) {
+        if (addUnique(list, item)) added++;
+      });
+      if (added > 0) {
+        var obj = {};
+        obj[storageKey] = list;
+        chrome.storage.local.set(obj);
+        render(list);
+        showToast(added + " " + itemNoun + (added > 1 ? "s" : "") + " added");
+      }
+    }
+
+    // Skipped Companies — input row + list
+    let companyAddRow = document.createElement("div");
+    companyAddRow.className = "list-search-row";
+    let companyAddInput = document.createElement("input");
+    companyAddInput.type = "text";
+    companyAddInput.placeholder = "Add companies (comma-separated)…";
+    companyAddInput.className = "list-search-input";
+    let companyAddBtn = document.createElement("button");
+    companyAddBtn.className = "list-item-remove";
+    companyAddBtn.textContent = "+";
+    companyAddBtn.style.cssText =
+      "font-size:16px;cursor:pointer;background:none;border:none;color:#D9797B;font-weight:bold;";
+    companyAddRow.appendChild(companyAddInput);
+    companyAddRow.appendChild(companyAddBtn);
+    jobsLists.appendChild(companyAddRow);
+
     let renderCompanies = createListSection(
       jobsLists,
       "Skipped Companies",
@@ -608,7 +690,33 @@ import {
     );
     renderCompanies(settings.skippedCompanies);
 
-    // Skipped Title Keywords list
+    function submitCompanyAdd() {
+      const val = companyAddInput.value.trim();
+      if (!val) return;
+      addToList(val, settings.skippedCompanies, "skippedCompanies", renderCompanies, "company");
+      companyAddInput.value = "";
+    }
+    companyAddBtn.addEventListener("click", submitCompanyAdd);
+    companyAddInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") submitCompanyAdd();
+    });
+
+    // Skipped Title Keywords — input row + list
+    let titleAddRow = document.createElement("div");
+    titleAddRow.className = "list-search-row";
+    let titleAddInput = document.createElement("input");
+    titleAddInput.type = "text";
+    titleAddInput.placeholder = "Add title keywords (comma-separated)…";
+    titleAddInput.className = "list-search-input";
+    let titleAddBtn = document.createElement("button");
+    titleAddBtn.className = "list-item-remove";
+    titleAddBtn.textContent = "+";
+    titleAddBtn.style.cssText =
+      "font-size:16px;cursor:pointer;background:none;border:none;color:#D9797B;font-weight:bold;";
+    titleAddRow.appendChild(titleAddInput);
+    titleAddRow.appendChild(titleAddBtn);
+    jobsLists.appendChild(titleAddRow);
+
     let renderTitleKw = createListSection(
       jobsLists,
       "Skipped Title Keywords",
@@ -620,6 +728,23 @@ import {
       }
     );
     renderTitleKw(settings.skippedTitleKeywords);
+
+    function submitTitleKwAdd() {
+      const val = titleAddInput.value.trim();
+      if (!val) return;
+      addToList(
+        val,
+        settings.skippedTitleKeywords,
+        "skippedTitleKeywords",
+        renderTitleKw,
+        "keyword"
+      );
+      titleAddInput.value = "";
+    }
+    titleAddBtn.addEventListener("click", submitTitleKwAdd);
+    titleAddInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") submitTitleKwAdd();
+    });
 
     container.appendChild(jobsGroup);
 

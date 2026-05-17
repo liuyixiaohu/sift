@@ -43,6 +43,10 @@
     // Storage schema version — bumped via src/shared/schema.js#migrate when
     // the shape of stored data changes. New installs start at the latest.
     schemaVersion: 2,
+    // Global master toggle. When true, all filtering / hiding / dimming is
+    // suspended across feed, profile, network, and jobs pages. Diagnostic
+    // counts still flow so the user can see what Sift WOULD hide if unpaused.
+    siftPaused: false,
     // Feed page
     hidePromoted: true,
     hideSuggested: true,
@@ -76,6 +80,7 @@
   var _defaults = SIFT_DEFAULTS;
   async function loadSettings() {
     const data = await chrome.storage.local.get({
+      siftPaused: _defaults.siftPaused ?? false,
       skippedCompanies: _defaults.skippedCompanies || [],
       skippedTitleKeywords: _defaults.skippedTitleKeywords || [],
       sponsorCheckEnabled: _defaults.sponsorCheckEnabled ?? true,
@@ -86,6 +91,7 @@
       dimFiltered: _defaults.dimFiltered ?? false,
       hideFiltered: _defaults.hideFiltered ?? false
     });
+    const active = !data.siftPaused;
     state.skippedCompanies = data.skippedCompanies;
     state.skippedTitleKeywords = data.skippedTitleKeywords;
     state.sponsorCheckEnabled = data.sponsorCheckEnabled;
@@ -93,8 +99,8 @@
     state.autoSkipDetected = data.autoSkipDetected;
     state.hasSeenIntro = data.hasSeenIntro;
     state.panelPosition = data.panelPosition;
-    state.cardsDimmed = data.dimFiltered;
-    state.cardsHidden = data.hideFiltered;
+    state.cardsDimmed = active && data.dimFiltered;
+    state.cardsHidden = active && data.hideFiltered;
   }
   function saveValue(key, value) {
     chrome.storage.local.set({ [key]: value });
@@ -545,13 +551,13 @@
   // src/jobs/toast.js
   var TOAST_ID = "lj-toast";
   var TOAST_VISIBLE_MS = 2e3;
+  var TOAST_UNDO_VISIBLE_MS = 5e3;
   var TOAST_FADE_MS = 300;
-  function showToast(message) {
+  function showToast(message, options = {}) {
     const existing = document.getElementById(TOAST_ID);
     if (existing) existing.remove();
     const toast = document.createElement("div");
     toast.id = TOAST_ID;
-    toast.textContent = message;
     Object.assign(toast.style, {
       position: "fixed",
       bottom: "30px",
@@ -566,13 +572,47 @@
       fontWeight: "600",
       zIndex: "99999",
       boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-      transition: "opacity 0.3s"
+      transition: "opacity 0.3s",
+      display: "flex",
+      alignItems: "center",
+      gap: "12px"
     });
-    document.body.appendChild(toast);
-    setTimeout(() => {
+    const messageEl = document.createElement("span");
+    messageEl.textContent = message;
+    toast.appendChild(messageEl);
+    let timer;
+    const dismiss = () => {
+      clearTimeout(timer);
       toast.style.opacity = "0";
       setTimeout(() => toast.remove(), TOAST_FADE_MS);
-    }, TOAST_VISIBLE_MS);
+    };
+    if (typeof options.undo === "function") {
+      const undoBtn = document.createElement("button");
+      undoBtn.textContent = "Undo";
+      Object.assign(undoBtn.style, {
+        background: "none",
+        border: "1px solid rgba(250, 247, 242, 0.5)",
+        color: "#FAF7F2",
+        cursor: "pointer",
+        fontFamily: "'EB Garamond',Garamond,serif",
+        fontSize: "13px",
+        fontWeight: "600",
+        padding: "2px 10px",
+        borderRadius: "4px"
+      });
+      undoBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        try {
+          options.undo();
+        } finally {
+          dismiss();
+        }
+      });
+      toast.appendChild(undoBtn);
+    }
+    document.body.appendChild(toast);
+    const visibleMs = typeof options.undo === "function" ? TOAST_UNDO_VISIBLE_MS : TOAST_VISIBLE_MS;
+    timer = setTimeout(dismiss, visibleMs);
   }
 
   // src/jobs/active.js
@@ -1051,7 +1091,16 @@
     saveValue("skippedCompanies", state.skippedCompanies);
     renderLists();
     refilterAll();
-    showToast("Skipped: " + name);
+    showToast("Skipped: " + name, {
+      undo: () => {
+        const idx = state.skippedCompanies.lastIndexOf(name);
+        if (idx === -1) return;
+        state.skippedCompanies.splice(idx, 1);
+        saveValue("skippedCompanies", state.skippedCompanies);
+        renderLists();
+        refilterAll();
+      }
+    });
   }
   function renderLists() {
     renderRecent(state.ui.companyRecent, state.skippedCompanies, "company");
@@ -1216,6 +1265,7 @@
     attachRouteHandlers({ init, renderLists });
     bootstrapJobsObserver({ renderLists });
     const SETTING_KEYS = [
+      "siftPaused",
       "skippedCompanies",
       "skippedTitleKeywords",
       "sponsorCheckEnabled",
@@ -1229,6 +1279,7 @@
       if (!SETTING_KEYS.some((k) => k in changes)) return;
       chrome.storage.local.get(
         {
+          siftPaused: false,
           skippedCompanies: [],
           skippedTitleKeywords: [],
           sponsorCheckEnabled: true,
@@ -1238,14 +1289,18 @@
           hideFiltered: false
         },
         (data) => {
+          const active = !data.siftPaused;
           state.skippedCompanies = data.skippedCompanies;
           state.skippedTitleKeywords = data.skippedTitleKeywords;
           state.sponsorCheckEnabled = data.sponsorCheckEnabled;
           state.unpaidCheckEnabled = data.unpaidCheckEnabled;
           state.autoSkipDetected = data.autoSkipDetected;
-          state.cardsDimmed = data.dimFiltered;
-          state.cardsHidden = data.hideFiltered;
+          state.cardsDimmed = active && data.dimFiltered;
+          state.cardsHidden = active && data.hideFiltered;
           renderLists();
+          if ("siftPaused" in changes) {
+            document.querySelectorAll(".lj-card-hidden, .lj-card-dimmed").forEach((c) => c.classList.remove("lj-card-hidden", "lj-card-dimmed"));
+          }
           state.processedCards = /* @__PURE__ */ new WeakSet();
           filterJobCards();
         }

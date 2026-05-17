@@ -25,6 +25,9 @@ const SCHEMA_TYPES = {
   // Schema version itself
   schemaVersion: "number",
 
+  // Global master toggle
+  siftPaused: "boolean",
+
   // Feed-page toggles
   hidePromoted: "boolean",
   hideSuggested: "boolean",

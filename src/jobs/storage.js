@@ -7,6 +7,7 @@ const _defaults = SIFT_DEFAULTS;
 
 export async function loadSettings() {
   const data = await chrome.storage.local.get({
+    siftPaused: _defaults.siftPaused ?? false,
     skippedCompanies: _defaults.skippedCompanies || [],
     skippedTitleKeywords: _defaults.skippedTitleKeywords || [],
     sponsorCheckEnabled: _defaults.sponsorCheckEnabled ?? true,
@@ -17,6 +18,7 @@ export async function loadSettings() {
     dimFiltered: _defaults.dimFiltered ?? false,
     hideFiltered: _defaults.hideFiltered ?? false,
   });
+  const active = !data.siftPaused;
   state.skippedCompanies = data.skippedCompanies;
   state.skippedTitleKeywords = data.skippedTitleKeywords;
   state.sponsorCheckEnabled = data.sponsorCheckEnabled;
@@ -24,8 +26,10 @@ export async function loadSettings() {
   state.autoSkipDetected = data.autoSkipDetected;
   state.hasSeenIntro = data.hasSeenIntro;
   state.panelPosition = data.panelPosition;
-  state.cardsDimmed = data.dimFiltered;
-  state.cardsHidden = data.hideFiltered;
+  // Pause suppresses the visual filter; cards still get badges (data-lj-reasons)
+  // so we don't lose detection state, just the dim/hide treatment.
+  state.cardsDimmed = active && data.dimFiltered;
+  state.cardsHidden = active && data.hideFiltered;
 }
 
 export function saveValue(key, value) {

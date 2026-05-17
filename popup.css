@@ -146,6 +146,48 @@ body {
   border-bottom: 1px solid #E4DDD2;
 }
 
+/* === Master pause row ===
+ * The "Sift is active / paused" switch lives at the very top of Controls.
+ * Higher visual weight than a regular toggle row so it reads as the
+ * master switch and not just another setting.
+ */
+.pause-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(217, 121, 123, 0.06);
+  border: 1px solid rgba(217, 121, 123, 0.18);
+  border-radius: 8px;
+  margin-bottom: 10px;
+}
+
+.pause-row[data-paused="true"] {
+  background: rgba(228, 221, 210, 0.5);
+  border-color: #E4DDD2;
+}
+
+.pause-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.pause-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1F2328;
+}
+
+.pause-row[data-paused="true"] .pause-label {
+  color: #8A939B;
+}
+
+.pause-sub {
+  font-size: 11px;
+  color: #5A636B;
+}
+
 /* === Diagnostic panel ===
  * Live "what does Sift see on this page" strip at the top of the Controls
  * tab. One line, compact. Surfaces selector breakage early — if the user has
@@ -215,6 +257,12 @@ body {
 
 /* Subtle pulse while waiting for the content script to reply */
 .diag-panel[data-state="loading"] .diag-message {
+  opacity: 0.6;
+}
+
+/* When Sift is paused, the counts are advisory — dim so they don't read as
+ * "active filtering". The pause-row above the diag already explains state. */
+.diag-panel[data-paused="true"] {
   opacity: 0.6;
 }
 

@@ -48,7 +48,7 @@ if (chrome.runtime?.id) {
 
   // === Storage ===
   const DEFAULTS = SIFT_DEFAULTS;
-  const SETTING_KEYS = new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywordMatchMode", "feedKeywords", "postAgeLimit", "hideProfileAnalytics", "hideProfileSuggestions"]);
+  const SETTING_KEYS = new Set(["siftPaused", "hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywordMatchMode", "feedKeywords", "postAgeLimit", "hideProfileAnalytics", "hideProfileSuggestions"]);
   let settings = { ...DEFAULTS };
 
   function loadSettings(cb) {
@@ -409,8 +409,16 @@ if (chrome.runtime?.id) {
   function updateBadgeCount() {
     const badge = feedDoc.getElementById("lj-mini-badge");
     if (!badge) return;
-    const count = feedDoc.querySelectorAll('[data-lj-promoted="true"], [data-lj-suggested="true"], [data-lj-recommended="true"], [data-lj-non-connection="true"], [data-lj-poll="true"], [data-lj-celebration="true"], [data-lj-keyword-filtered="true"], [data-lj-too-old="true"]').length;
-    badge.textContent = count > 0 ? "\uD83D\uDD0D " + count + " filtered" : "\uD83D\uDD0D Sift";
+    if (settings.siftPaused) {
+      badge.dataset.paused = "true";
+      badge.textContent = "\uD83D\uDD0D Sift paused";
+    } else {
+      delete badge.dataset.paused;
+      const count = feedDoc.querySelectorAll(
+        '[data-lj-promoted="true"], [data-lj-suggested="true"], [data-lj-recommended="true"], [data-lj-non-connection="true"], [data-lj-poll="true"], [data-lj-celebration="true"], [data-lj-keyword-filtered="true"], [data-lj-too-old="true"]'
+      ).length;
+      badge.textContent = count > 0 ? "\uD83D\uDD0D " + count + " filtered" : "\uD83D\uDD0D Sift";
+    }
     // Also update breakdown if visible
     const tip = feedDoc.getElementById("lj-badge-tip");
     if (tip && tip.classList.contains("visible")) updateBreakdown();
@@ -514,10 +522,15 @@ if (chrome.runtime?.id) {
   }
 
   function applyProfileClasses() {
-    document.body.classList.toggle("lj-hide-profile-analytics", settings.hideProfileAnalytics);
+    const active = !settings.siftPaused;
+    document.body.classList.toggle("lj-sift-paused", settings.siftPaused);
+    document.body.classList.toggle(
+      "lj-hide-profile-analytics",
+      active && settings.hideProfileAnalytics
+    );
     document.body.classList.toggle(
       "lj-hide-profile-suggestions",
-      settings.hideProfileSuggestions
+      active && settings.hideProfileSuggestions
     );
     markProfileNoise();
   }
@@ -549,14 +562,18 @@ if (chrome.runtime?.id) {
   let networkInitialized = false;
 
   function hideNetworkAds() {
+    const active = !settings.siftPaused;
     // Hide ad iframe container (Promoted ad in left sidebar)
-    const adIframe = document.querySelector('iframe[src="about:blank"]');
-    if (adIframe) {
-      const adCard = adIframe.parentElement?.parentElement;
-      if (adCard && adCard.offsetWidth < 400) adCard.style.display = "none";
+    if (active) {
+      const adIframe = document.querySelector('iframe[src="about:blank"]');
+      if (adIframe) {
+        const adCard = adIframe.parentElement?.parentElement;
+        if (adCard && adCard.offsetWidth < 400) adCard.style.display = "none";
+      }
     }
     // Game promo is handled by CSS via body class
-    document.body.classList.toggle("lj-hide-network-game", settings.hidePromoted);
+    document.body.classList.toggle("lj-sift-paused", settings.siftPaused);
+    document.body.classList.toggle("lj-hide-network-game", active && settings.hidePromoted);
   }
 
   function bootNetwork() {
@@ -580,20 +597,31 @@ if (chrome.runtime?.id) {
   }
 
   function applyBodyClasses() {
-    feedDoc.body.classList.toggle("lj-hide-promoted", settings.hidePromoted);
-    feedDoc.body.classList.toggle("lj-hide-suggested", settings.hideSuggested);
-    feedDoc.body.classList.toggle("lj-hide-recommended", settings.hideRecommended);
-    feedDoc.body.classList.toggle("lj-hide-non-connections", settings.hideNonConnections);
-    feedDoc.body.classList.toggle("lj-hide-polls", settings.hidePolls);
-    feedDoc.body.classList.toggle("lj-hide-celebrations", settings.hideCelebrations);
-    feedDoc.body.classList.toggle("lj-hide-keyword-filtered", settings.feedKeywordFilterEnabled);
-    feedDoc.body.classList.toggle("lj-hide-old-posts", settings.postAgeLimit > 0);
+    // `siftPaused` short-circuits all hiding — we keep scanning so diagnostic
+    // counts stay live, but no body class flips on. Single source of truth
+    // for the on/off semantics across feed + profile + network.
+    const active = !settings.siftPaused;
+    feedDoc.body.classList.toggle("lj-sift-paused", settings.siftPaused);
+    feedDoc.body.classList.toggle("lj-hide-promoted", active && settings.hidePromoted);
+    feedDoc.body.classList.toggle("lj-hide-suggested", active && settings.hideSuggested);
+    feedDoc.body.classList.toggle("lj-hide-recommended", active && settings.hideRecommended);
+    feedDoc.body.classList.toggle(
+      "lj-hide-non-connections",
+      active && settings.hideNonConnections
+    );
+    feedDoc.body.classList.toggle("lj-hide-polls", active && settings.hidePolls);
+    feedDoc.body.classList.toggle("lj-hide-celebrations", active && settings.hideCelebrations);
+    feedDoc.body.classList.toggle(
+      "lj-hide-keyword-filtered",
+      active && settings.feedKeywordFilterEnabled
+    );
+    feedDoc.body.classList.toggle("lj-hide-old-posts", active && settings.postAgeLimit > 0);
     // The Suggestions & Ads toggle covers both /feed/ (LinkedIn News, Today's
     // puzzles, ads) and /in/* (Suggested for you, recommendations, ads).
     // Wrapper marking happens in scanPosts() for feed; bootProfile() handles profile.
     feedDoc.body.classList.toggle(
       "lj-hide-profile-suggestions",
-      settings.hideProfileSuggestions
+      active && settings.hideProfileSuggestions
     );
   }
 
@@ -617,6 +645,7 @@ if (chrome.runtime?.id) {
     return {
       url: location.href,
       pageType: detectPageType(),
+      paused: !!settings.siftPaused,
       feed: {
         promoted: feedQ('[data-lj-promoted="true"]'),
         suggested: feedQ('[data-lj-suggested="true"]'),

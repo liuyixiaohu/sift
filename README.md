@@ -60,9 +60,10 @@ npm install          # install esbuild, vitest, eslint, prettier
 npm run build        # bundle src/ → root JS files (IIFE)
 npm run watch        # rebuild on file changes
 npm test             # run unit tests
-npm run lint         # ESLint over src/, tests/, build script
+npm run lint         # ESLint over src/, tests/, build + pack scripts
 npm run format       # apply Prettier
 npm run format:check # verify Prettier formatting (CI step)
+npm run pack         # build a Chrome Web Store-ready ZIP under dist/
 ```
 
 Source lives in `src/`, shared modules in `src/shared/`. esbuild bundles each entry point into a self-contained IIFE at the project root for Chrome to load.

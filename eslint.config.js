@@ -38,9 +38,9 @@ export default [
       ],
     },
   },
-  // Build script + config files (Node, ESM)
+  // Build / pack scripts + config files (Node, ESM)
   {
-    files: ["build.js", "eslint.config.js"],
+    files: ["build.js", "pack.js", "eslint.config.js"],
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: "module",

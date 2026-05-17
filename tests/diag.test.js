@@ -18,6 +18,7 @@ function feedDiag(over = {}) {
     },
     profile: { noise: 0, analytics: 0 },
     jobs: { flagged: 0 },
+    invalidKeywords: 0,
     ...over,
   };
 }
@@ -190,6 +191,58 @@ describe("relevantCountsFor", () => {
         n: 3,
         severity: "ok",
       });
+    });
+  });
+
+  describe("invalid-keyword case (don't blame LinkedIn for user typos)", () => {
+    it("renders 'Invalid regex' (userError) when invalidKeywords > 0 and matches = 0", () => {
+      // The headline case: user is on regex mode, typed `(unterminated`,
+      // every post gets scanned with that keyword silently skipped. Diag
+      // panel must NOT show ⚠ "Keywords" warn (which falsely blames
+      // LinkedIn) — it must point the user at their broken input.
+      const items = relevantCountsFor({ ...feedDiag(), invalidKeywords: 1 }, { ...ALL_ON });
+      const kw = items.find((i) => i.label === "Keywords" || i.label === "Invalid regex");
+      expect(kw).toEqual({ label: "Invalid regex", n: 1, severity: "userError" });
+      // And NO warn-severity Keywords chip should be present
+      expect(items.find((i) => i.label === "Keywords")).toBeUndefined();
+    });
+
+    it("when keywords are matching, doesn't surface invalid count as userError", () => {
+      // Mixed case: some invalid keywords AND some good matches. We
+      // prioritize the positive count — the user knows the filter is
+      // working; they'll discover the invalid ones via the popup toast.
+      const items = relevantCountsFor(
+        {
+          ...feedDiag(),
+          feed: { ...feedDiag().feed, keywordFiltered: 4 },
+          invalidKeywords: 1,
+        },
+        ALL_ON
+      );
+      expect(items.find((i) => i.label === "Keywords")).toEqual({
+        label: "Keywords",
+        n: 4,
+        severity: "ok",
+      });
+      expect(items.find((i) => i.label === "Invalid regex")).toBeUndefined();
+    });
+
+    it("does NOT surface invalid-regex chip when paused", () => {
+      // Same rationale as the paused/warn rule: in paused state, zero
+      // counts are expected, don't cry wolf.
+      const items = relevantCountsFor({ ...feedDiag(), paused: true, invalidKeywords: 2 }, ALL_ON);
+      expect(items.find((i) => i.label === "Invalid regex")).toBeUndefined();
+    });
+
+    it("does NOT surface invalid-regex chip when feedKeywordFilterEnabled is off", () => {
+      // Toggle off → user explicitly doesn't want the filter. The 2
+      // invalid keywords don't matter to them right now.
+      const items = relevantCountsFor(
+        { ...feedDiag(), invalidKeywords: 2 },
+        { ...ALL_ON, feedKeywordFilterEnabled: false }
+      );
+      expect(items.find((i) => i.label === "Invalid regex")).toBeUndefined();
+      expect(items.find((i) => i.label === "Keywords")).toBeUndefined();
     });
   });
 });

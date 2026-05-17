@@ -30,6 +30,41 @@ export function keywordsToRegex(keywords) {
  */
 export const FEED_KEYWORD_MATCH_MODES = ["wholeWord", "substring", "regex"];
 
+/**
+ * Partition a keyword list into `valid` and `invalid` for the given mode.
+ *
+ * Only `regex` mode has invalid forms (unterminated groups, bad escapes,
+ * etc.); `wholeWord` and `substring` accept any string. Empty / whitespace-
+ * only keywords are excluded from both lists (treated as "not present").
+ *
+ * Used by the popup to gate user input at add-time AND by the content
+ * script to flag the user-error case to the diagnostic panel — so the
+ * panel can stop blaming LinkedIn for a malformed regex the user typed.
+ *
+ * @param {string[]} keywords
+ * @param {"wholeWord" | "substring" | "regex"} mode
+ * @returns {{valid: string[], invalid: string[]}}
+ */
+export function validateKeywords(keywords, mode) {
+  const out = { valid: [], invalid: [] };
+  if (!Array.isArray(keywords)) return out;
+  for (const kw of keywords) {
+    if (typeof kw !== "string") continue;
+    if (kw.trim() === "") continue;
+    if (mode === "regex") {
+      try {
+        new RegExp(kw, "i");
+        out.valid.push(kw);
+      } catch {
+        out.invalid.push(kw);
+      }
+    } else {
+      out.valid.push(kw);
+    }
+  }
+  return out;
+}
+
 // `\b` only marks transitions between word chars [a-zA-Z0-9_] and non-word
 // chars. A keyword starting/ending with a non-word char (e.g. "#ai", "c++")
 // won't behave intuitively — for those, fall back to substring on a

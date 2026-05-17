@@ -81,7 +81,16 @@
       push("Strangers", diag.feed.nonConnection, !!settings.hideNonConnections, true);
       push("Polls", diag.feed.poll, !!settings.hidePolls, true);
       push("Celebrations", diag.feed.celebration, !!settings.hideCelebrations, true);
-      push("Keywords", diag.feed.keywordFiltered, !!settings.feedKeywordFilterEnabled, true);
+      const invalidKw = diag.invalidKeywords || 0;
+      if (settings.feedKeywordFilterEnabled) {
+        if (diag.feed.keywordFiltered > 0) {
+          items.push({ label: "Keywords", n: diag.feed.keywordFiltered, severity: "ok" });
+        } else if (invalidKw > 0 && !paused) {
+          items.push({ label: "Invalid regex", n: invalidKw, severity: "userError" });
+        } else if (!paused) {
+          items.push({ label: "Keywords", n: 0, severity: "warn" });
+        }
+      }
       push("Too old", diag.feed.tooOld, (settings.postAgeLimit || 0) > 0, true);
       push("Sidebar widgets", diag.profile.noise, !!settings.hideProfileSuggestions, true);
     } else if (diag.pageType === "profile") {
@@ -118,6 +127,27 @@
       }
     }
     return before - list.length;
+  }
+
+  // src/shared/matching.js
+  function validateKeywords(keywords, mode) {
+    const out = { valid: [], invalid: [] };
+    if (!Array.isArray(keywords)) return out;
+    for (const kw of keywords) {
+      if (typeof kw !== "string") continue;
+      if (kw.trim() === "") continue;
+      if (mode === "regex") {
+        try {
+          new RegExp(kw, "i");
+          out.valid.push(kw);
+        } catch {
+          out.invalid.push(kw);
+        }
+      } else {
+        out.valid.push(kw);
+      }
+    }
+    return out;
   }
 
   // src/shared/schema.js
@@ -466,6 +496,9 @@
           if (item.severity === "warn") {
             chip.textContent = "\u26A0 0 " + item.label;
             chip.title = item.label + " filter is ON but Sift saw 0 matches on this page \u2014 LinkedIn DOM may have changed.";
+          } else if (item.severity === "userError") {
+            chip.textContent = "\u26A0 " + item.n + " " + item.label;
+            chip.title = "One or more keywords don't compile as regex. Switch Match Mode or fix the patterns to use the Keywords filter.";
           } else {
             chip.textContent = item.n + " " + item.label;
           }
@@ -487,8 +520,25 @@
             return;
           }
           chrome.tabs.sendMessage(tab.id, { type: "SIFT_DIAG" }, function(diag) {
-            if (chrome.runtime.lastError || !diag) {
-              renderMessage("error", "Reload the LinkedIn tab to see diagnostics");
+            const err = chrome.runtime.lastError;
+            if (err) {
+              const msg = err.message || "";
+              if (msg.indexOf("Could not establish connection") !== -1) {
+                renderMessage("error", "Reload the LinkedIn tab to see diagnostics");
+              } else {
+                console.warn("[Sift] diag sendMessage error:", msg);
+                renderMessage("error", "Diagnostics unavailable \u2014 check the console");
+              }
+              return;
+            }
+            if (!diag) {
+              console.warn("[Sift] diag response was empty");
+              renderMessage("error", "Diagnostics unavailable \u2014 check the console");
+              return;
+            }
+            if (diag.error) {
+              console.warn("[Sift] content-script diag threw:", diag.error);
+              renderMessage("error", "Diagnostics error: " + diag.error);
               return;
             }
             renderDiag(diag);
@@ -653,13 +703,25 @@
         const newKws = val.split(",").map(function(s) {
           return s.trim();
         }).filter(Boolean);
+        const currentMode = settings.feedKeywordMatchMode || "substring";
+        const { valid, invalid } = validateKeywords(newKws, currentMode);
         let added = 0;
-        newKws.forEach(function(kw) {
+        valid.forEach(function(kw) {
           if (addUnique(settings.feedKeywords, kw)) added++;
         });
         if (added > 0) {
           chrome.storage.local.set({ feedKeywords: settings.feedKeywords });
           renderFeedKw(settings.feedKeywords);
+        }
+        if (invalid.length > 0 && added > 0) {
+          showToast(
+            added + " added, " + invalid.length + " skipped (invalid regex)"
+          );
+        } else if (invalid.length > 0) {
+          showToast(
+            invalid.length === 1 ? "Skipped invalid regex: " + invalid[0] : "Skipped " + invalid.length + " invalid regexes"
+          );
+        } else if (added > 0) {
           showToast(added + " keyword" + (added > 1 ? "s" : "") + " added");
         }
         kwInput.value = "";

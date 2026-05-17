@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { keywordsToRegex, matchesFeedKeyword } from "../src/shared/matching.js";
+import { keywordsToRegex, matchesFeedKeyword, validateKeywords } from "../src/shared/matching.js";
 
 describe("keywordsToRegex", () => {
   it("creates a regex matching any keyword", () => {
@@ -125,5 +125,48 @@ describe("matchesFeedKeyword", () => {
       // null since no other keyword matches.
       expect(matchesFeedKeyword("anything", ["(unterminated"], "regex")).toBeNull();
     });
+
+    it("invalid keyword doesn't poison the rest of the array", () => {
+      // Critical: one bad regex shouldn't disable every later keyword.
+      // (Coverage gap surfaced by the test-coverage review agent.)
+      expect(
+        matchesFeedKeyword("looking for valid match", ["(unterminated", "valid"], "regex")
+      ).toBe("valid");
+    });
+  });
+});
+
+describe("validateKeywords", () => {
+  it("partitions regex keywords into valid + invalid", () => {
+    const { valid, invalid } = validateKeywords(
+      ["w.rld", "(unterminated", "\\d+", ")extra-close"],
+      "regex"
+    );
+    expect(valid).toEqual(["w.rld", "\\d+"]);
+    expect(invalid).toEqual(["(unterminated", ")extra-close"]);
+  });
+
+  it("treats all wholeWord keywords as valid (no compile step)", () => {
+    const { valid, invalid } = validateKeywords(["ai", "c++", "#hashtag"], "wholeWord");
+    expect(valid).toEqual(["ai", "c++", "#hashtag"]);
+    expect(invalid).toEqual([]);
+  });
+
+  it("treats all substring keywords as valid", () => {
+    const { valid, invalid } = validateKeywords(["(unterminated", "anything"], "substring");
+    // Substring mode never compiles — anything goes
+    expect(valid).toEqual(["(unterminated", "anything"]);
+    expect(invalid).toEqual([]);
+  });
+
+  it("filters out empty / whitespace-only / non-string entries", () => {
+    const { valid, invalid } = validateKeywords(["", "  ", "real", null, 42], "regex");
+    expect(valid).toEqual(["real"]);
+    expect(invalid).toEqual([]);
+  });
+
+  it("returns empty arrays for non-array input", () => {
+    expect(validateKeywords(null, "regex")).toEqual({ valid: [], invalid: [] });
+    expect(validateKeywords(undefined, "wholeWord")).toEqual({ valid: [], invalid: [] });
   });
 });

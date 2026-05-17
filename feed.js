@@ -63,6 +63,25 @@
   };
 
   // src/shared/matching.js
+  function validateKeywords(keywords, mode) {
+    const out = { valid: [], invalid: [] };
+    if (!Array.isArray(keywords)) return out;
+    for (const kw of keywords) {
+      if (typeof kw !== "string") continue;
+      if (kw.trim() === "") continue;
+      if (mode === "regex") {
+        try {
+          new RegExp(kw, "i");
+          out.valid.push(kw);
+        } catch {
+          out.invalid.push(kw);
+        }
+      } else {
+        out.valid.push(kw);
+      }
+    }
+    return out;
+  }
   function startsWithWordChar(s) {
     return /^\w/.test(s);
   }
@@ -558,6 +577,11 @@
     }, collectDiagnostics = function() {
       const feedQ = (sel) => feedDoc.querySelectorAll(sel).length;
       const topQ = (sel) => document.querySelectorAll(sel).length;
+      const keywordMode = settings.feedKeywordMatchMode || "substring";
+      const { invalid: invalidKws } = validateKeywords(
+        settings.feedKeywords || [],
+        keywordMode
+      );
       return {
         url: location.href,
         pageType: detectPageType(),
@@ -578,7 +602,11 @@
         },
         jobs: {
           flagged: topQ("[data-lj-reasons]")
-        }
+        },
+        // > 0 means the user's regex keywords are unusable. The popup uses
+        // this to suppress the false "DOM may have changed" warning and
+        // instead point the user at their broken input.
+        invalidKeywords: invalidKws.length
       };
     }, injectFeedCssIntoIframe = function() {
       if (feedDoc === document) return;
@@ -733,7 +761,12 @@
     let networkInitialized = false;
     chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       if (msg?.type !== "SIFT_DIAG") return false;
-      sendResponse(collectDiagnostics());
+      try {
+        sendResponse(collectDiagnostics());
+      } catch (err) {
+        console.warn("[Sift] collectDiagnostics threw:", err);
+        sendResponse({ error: err?.message || String(err) });
+      }
       return false;
     });
     chrome.storage.onChanged.addListener((changes, area) => {

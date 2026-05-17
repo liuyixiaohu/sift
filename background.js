@@ -3,7 +3,7 @@
   var SIFT_DEFAULTS = {
     // Storage schema version — bumped via src/shared/schema.js#migrate when
     // the shape of stored data changes. New installs start at the latest.
-    schemaVersion: 1,
+    schemaVersion: 2,
     // Feed page
     hidePromoted: true,
     hideSuggested: true,
@@ -12,6 +12,10 @@
     hidePolls: false,
     hideCelebrations: false,
     feedKeywordFilterEnabled: true,
+    // Match mode for feedKeywords: "wholeWord" | "substring" | "regex".
+    // New installs get "wholeWord" — see src/shared/matching.js for semantics.
+    // Existing v1 users are migrated to "substring" to preserve behavior.
+    feedKeywordMatchMode: "wholeWord",
     feedKeywords: [],
     postAgeLimit: 0,
     // 0 = off, days threshold: 1, 3, 7, 14, 30
@@ -30,13 +34,19 @@
   };
 
   // src/shared/schema.js
-  var SCHEMA_VERSION = 1;
+  var SCHEMA_VERSION = 2;
   var STORAGE_QUOTA_BYTES = 10 * 1024 * 1024;
   function migrate(data) {
     const v = typeof data.schemaVersion === "number" ? data.schemaVersion : 0;
     if (v >= SCHEMA_VERSION) return data;
     if (v < 1) {
       data.schemaVersion = 1;
+    }
+    if (v < 2) {
+      if (typeof data.feedKeywordMatchMode !== "string") {
+        data.feedKeywordMatchMode = "substring";
+      }
+      data.schemaVersion = 2;
     }
     return data;
   }

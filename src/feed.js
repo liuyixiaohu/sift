@@ -48,7 +48,7 @@ if (chrome.runtime?.id) {
 
   // === Storage ===
   const DEFAULTS = SIFT_DEFAULTS;
-  const SETTING_KEYS = new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywords", "postAgeLimit", "hideProfileAnalytics", "hideProfileSuggestions"]);
+  const SETTING_KEYS = new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywordMatchMode", "feedKeywords", "postAgeLimit", "hideProfileAnalytics", "hideProfileSuggestions"]);
   let settings = { ...DEFAULTS };
 
   function loadSettings(cb) {
@@ -208,7 +208,11 @@ if (chrome.runtime?.id) {
       if (settings.feedKeywordFilterEnabled && settings.feedKeywords && settings.feedKeywords.length > 0) {
         if (!article.dataset.ljKeywordChecked) {
           article.dataset.ljKeywordChecked = "1";
-          const matched = matchesFeedKeyword(article.textContent, settings.feedKeywords);
+          const matched = matchesFeedKeyword(
+            article.textContent,
+            settings.feedKeywords,
+            settings.feedKeywordMatchMode || "substring"
+          );
           if (matched) {
             article.dataset.ljKeywordFiltered = "true";
             incrementStat("keywordsHidden");
@@ -643,8 +647,12 @@ if (chrome.runtime?.id) {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
     if (!Object.keys(changes).some((k) => SETTING_KEYS.has(k))) return;
-    // Keyword list changed — clear marks so posts get re-evaluated
-    if ("feedKeywords" in changes || "feedKeywordFilterEnabled" in changes) {
+    // Keyword list or matching mode changed — clear marks so posts get re-evaluated
+    if (
+      "feedKeywords" in changes ||
+      "feedKeywordFilterEnabled" in changes ||
+      "feedKeywordMatchMode" in changes
+    ) {
       clearPostMarks("ljKeywordChecked", "ljKeywordFiltered");
     }
     if ("postAgeLimit" in changes) {

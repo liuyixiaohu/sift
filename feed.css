@@ -18,8 +18,21 @@ body.lj-hide-sidebar aside.scaffold-layout__aside {
   display: none !important;
 }
 
-/* Profile page: hide Analytics section */
-body.lj-hide-profile-analytics section:has(a[href*="/dashboard"]) {
+/* Profile page: hide Analytics section.
+ *
+ * LinkedIn's 2026 DOM nests the Analytics section INSIDE the outer profile
+ * `<section aria-label="Primary content">`. A naive `section:has(a[href*="/dashboard"])`
+ * selector matches both the inner Analytics section AND the outer profile
+ * section (because `:has()` is transitive — any ancestor that contains the
+ * dashboard link matches). That hid the entire profile.
+ *
+ * The `:not(:has(section a[href*="/dashboard"]))` clause restricts the match
+ * to the INNERMOST such section — i.e. a section that doesn't contain a
+ * nested section also matching. Structural rule, doesn't depend on LinkedIn's
+ * class names or aria-labels (which they rename every few months).
+ */
+body.lj-hide-profile-analytics
+  section:has(a[href*="/dashboard"]):not(:has(section a[href*="/dashboard"])) {
   display: none !important;
 }
 

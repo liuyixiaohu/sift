@@ -1,5 +1,28 @@
 # Changelog
 
+## v2.17
+
+A polish-and-resilience batch. Four merged PRs (#43–#46).
+
+### New
+- **Diagnostic panel in the popup.** Compact "On this page" strip at the top of the Controls tab showing what Sift currently detects on the active LinkedIn tab — live counts of ads, suggested, recommended, keywords, profile widgets, flagged jobs. Catches silent selector breakage in one glance: if Hide Ads is on but the panel reads "Feed · nothing detected yet" on a feed page, something has likely broken.
+- **Pause Sift master toggle.** Single switch at the top of Controls that suspends all filtering across feed, profile, network, and jobs. Lets you temporarily see LinkedIn's full feed without nuking your config. Scanning continues so the diagnostic panel keeps showing reference counts; mini-badge on LinkedIn goes muted with "Sift paused".
+- **Keyword match modes.** Three modes for `feedKeywords` matching:
+  - **Whole word** (default for new installs) — `\b`-bounded match. `ai` matches `AI engineers` but not `training` / `rain` / `fail`. Hashtags (`#ai`) and symbol keywords (`c++`) fall back to substring per-keyword so user intent isn't lost.
+  - **Substring** (legacy default; existing users are migrated to this so behavior doesn't silently change).
+  - **Regex** for power users — each keyword is a case-insensitive regex. Invalid patterns are skipped silently.
+- **Undo on Skip Current Company.** The job-page toast now offers an Undo button when you skip a company; one click pops the just-added entry. Toast lingers 5s instead of 2s when an undo is available.
+- **Add inputs for skip lists in the popup.** Parity with the jobs-page panel — comma/newline-separated bulk paste, dedup against existing items. Editing skip lists no longer requires the jobs page to be open.
+
+### Fixed / hardened
+- **Analytics widget hide now has a heading-text fallback.** The CSS rule keys on `a[href*="/dashboard"]`, but LinkedIn is mid-rollout to `/analytics` URLs (different cohorts see different DOM). When the rollout completes, the URL-based rule silently degrades to a no-op. A new heading-text marker (matches `<h2>Analytics</h2>` and tags the wrapper with `data-lj-profile-analytics`) keeps the toggle working. Both rules can match the same widget — `display: none` is idempotent.
+
+### Internal
+- **DOM selector smoke tests** (`tests/selectors.test.js`, `tests/fixtures/*.html`). First round of structural tests asserting our marker walks and selectors hold against captured LinkedIn DOM fixtures. When LinkedIn renames a class or restructures a widget, these tests fail with a specific signal instead of users silently losing filtering. Uses `linkedom` (devDep only, ~10x smaller than jsdom). 134 tests now (was 107).
+- **Schema bumped 1 → 2.** Migration pins existing users to `feedKeywordMatchMode: "substring"` so they don't see surprise behavior changes; new installs land on `wholeWord`.
+
+---
+
 ## v2.14
 
 ### Fixed

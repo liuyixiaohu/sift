@@ -239,6 +239,7 @@
         }
       }
       flushStats();
+      markProfileNoise();
     }, clearPostMarks = function(...keys) {
       const main = feedMain();
       if (!main) return;
@@ -376,16 +377,34 @@
       badge.textContent = count > 0 ? "\u{1F50D} " + count + " filtered" : "\u{1F50D} Sift";
       const tip = feedDoc.getElementById("lj-badge-tip");
       if (tip && tip.classList.contains("visible")) updateBreakdown();
-    }, markProfileNoise = function() {
-      document.querySelectorAll("section").forEach((s) => {
-        if (s.dataset.ljProfileNoise) return;
-        const h = s.querySelector("h2, h3");
-        if (!h) return;
-        const text = (h.textContent || "").trim();
-        if (PROFILE_NOISE_HEADINGS.has(text)) {
-          s.dataset.ljProfileNoise = "true";
+    }, findNoiseWrapper = function(headingEl) {
+      const section = headingEl.closest("section");
+      if (section) return section;
+      let walk = headingEl.parentElement;
+      while (walk && walk.parentElement) {
+        const parent = walk.parentElement;
+        if (parent.tagName === "ASIDE" || parent.tagName === "MAIN" || parent.tagName === "BODY") {
+          return walk;
         }
-      });
+        walk = parent;
+      }
+      return null;
+    }, markProfileNoise = function() {
+      const scopes = [
+        ...document.querySelectorAll("aside[aria-label]"),
+        document.querySelector("main")
+      ].filter(Boolean);
+      for (const scope of scopes) {
+        scope.querySelectorAll("h1, h2, h3, h4, p").forEach((el) => {
+          if (el.children.length > 0) return;
+          const text = (el.textContent || "").trim();
+          if (!PROFILE_NOISE_HEADINGS.has(text)) return;
+          const wrapper = findNoiseWrapper(el);
+          if (wrapper && !wrapper.dataset.ljProfileNoise) {
+            wrapper.dataset.ljProfileNoise = "true";
+          }
+        });
+      }
       document.querySelectorAll('iframe[title="advertisement"]').forEach((iframe) => {
         const wrapper = iframe.parentElement;
         if (wrapper && !wrapper.dataset.ljProfileNoise) {
@@ -450,6 +469,10 @@
       feedDoc.body.classList.toggle("lj-hide-celebrations", settings.hideCelebrations);
       feedDoc.body.classList.toggle("lj-hide-keyword-filtered", settings.feedKeywordFilterEnabled);
       feedDoc.body.classList.toggle("lj-hide-old-posts", settings.postAgeLimit > 0);
+      feedDoc.body.classList.toggle(
+        "lj-hide-profile-suggestions",
+        settings.hideProfileSuggestions
+      );
     }, hideSidebarElements = function() {
       feedDoc.querySelectorAll(SIDEBAR_SELECTOR_ALL).forEach((node) => {
         node.style.display = "none";
@@ -620,14 +643,19 @@
     let profileInitialized = false;
     let profileNoiseRetryTimer = null;
     const PROFILE_NOISE_HEADINGS = /* @__PURE__ */ new Set([
+      // Profile page
       "Suggested for you",
-      // middle column on the OWNER's profile (skills prompt, etc.)
+      // middle column (skills prompt, etc.)
       "Who your viewers also viewed",
-      // Premium widget in the right column
+      // Premium right-column widget
       "People you may know",
       // right column
-      "You might like"
+      "You might like",
       // right column
+      // Feed page (right sidebar widgets)
+      "LinkedIn News",
+      "Today\u2019s puzzles"
+      // curly apostrophe — LinkedIn uses it consistently
     ]);
     let networkInitialized = false;
     chrome.storage.onChanged.addListener((changes, area) => {

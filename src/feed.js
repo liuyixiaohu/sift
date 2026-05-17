@@ -236,6 +236,10 @@ if (chrome.runtime?.id) {
       }
     }
     flushStats();
+    // Re-mark feed-sidebar widgets each tick. Cheap because findNoiseWrapper
+    // bails on already-tagged elements, and the scope is limited to
+    // aside/main subtrees.
+    markProfileNoise();
   }
 
   // Clear dataset marks on all articles so they get re-evaluated on next scan.
@@ -414,34 +418,74 @@ if (chrome.runtime?.id) {
   let profileInitialized = false;
   let profileNoiseRetryTimer = null;
 
-  // Heading texts (from <h2> or <h3> at the top of each section) that mark a
-  // profile-page widget as "noise". CSS can't match on text content, so we
-  // tag matching sections with `data-lj-profile-noise="true"` and let CSS hide
-  // by attribute. Locale-fragile (English-LinkedIn only) — see project memory.
+  // Heading texts at the top of each "noise" widget that the
+  // hideProfileSuggestions toggle should hide. CSS can't match on text
+  // content, so we tag matching wrappers with `data-lj-profile-noise="true"`
+  // and let CSS hide by attribute. Locale-fragile (English-LinkedIn only) —
+  // see project memory `feedback_sift_english_only`.
+  //
+  // LinkedIn uses different heading tags per widget — profile-page sections
+  // use <h2>/<h3>, but feed-page sidebar widgets use <p>. The marker accepts
+  // any of those.
+  //
+  // Note: "Today's puzzles" uses a CURLY apostrophe (U+2019), not ASCII '.
   const PROFILE_NOISE_HEADINGS = new Set([
-    "Suggested for you", // middle column on the OWNER's profile (skills prompt, etc.)
-    "Who your viewers also viewed", // Premium widget in the right column
+    // Profile page
+    "Suggested for you", // middle column (skills prompt, etc.)
+    "Who your viewers also viewed", // Premium right-column widget
     "People you may know", // right column
     "You might like", // right column
+    // Feed page (right sidebar widgets)
+    "LinkedIn News",
+    "Today’s puzzles", // curly apostrophe — LinkedIn uses it consistently
   ]);
 
-  function markProfileNoise() {
-    document.querySelectorAll("section").forEach((s) => {
-      if (s.dataset.ljProfileNoise) return;
-      // First heading inside the section identifies it. Don't walk into nested
-      // popups (e.g. the <dialog> with "Ad Options" inside Premium widgets) —
-      // querySelector returns the first heading in document order which is the
-      // section's own title.
-      const h = s.querySelector("h2, h3");
-      if (!h) return;
-      const text = (h.textContent || "").trim();
-      if (PROFILE_NOISE_HEADINGS.has(text)) {
-        s.dataset.ljProfileNoise = "true";
+  // Find the widget wrapper around a heading element: the closest <section>
+  // if there is one, else the highest ancestor that's still a "card-level"
+  // wrapper (parent is an aside, main, or the document body). This catches
+  // both profile sections AND feed sidebar widgets that LinkedIn renders
+  // without a <section> wrapper.
+  function findNoiseWrapper(headingEl) {
+    const section = headingEl.closest("section");
+    if (section) return section;
+    let walk = headingEl.parentElement;
+    while (walk && walk.parentElement) {
+      const parent = walk.parentElement;
+      if (
+        parent.tagName === "ASIDE" ||
+        parent.tagName === "MAIN" ||
+        parent.tagName === "BODY"
+      ) {
+        return walk;
       }
-    });
-    // Also mark direct wrappers of LinkedIn's ad iframes — they're not in a
-    // <section>, but the iframe has the required `title="advertisement"`
-    // accessibility attribute, which is structurally stable.
+      walk = parent;
+    }
+    return null;
+  }
+
+  function markProfileNoise() {
+    // Limit the scan scope to sidebar/main containers — avoids hammering the
+    // whole document on each call, since this fires from the feed scan tick.
+    const scopes = [
+      ...document.querySelectorAll("aside[aria-label]"),
+      document.querySelector("main"),
+    ].filter(Boolean);
+
+    for (const scope of scopes) {
+      // Heading-like leaves: <h1>-<h4> on profile sections, <p> on feed sidebar.
+      scope.querySelectorAll("h1, h2, h3, h4, p").forEach((el) => {
+        if (el.children.length > 0) return; // leaf nodes only — skip wrappers
+        const text = (el.textContent || "").trim();
+        if (!PROFILE_NOISE_HEADINGS.has(text)) return;
+        const wrapper = findNoiseWrapper(el);
+        if (wrapper && !wrapper.dataset.ljProfileNoise) {
+          wrapper.dataset.ljProfileNoise = "true";
+        }
+      });
+    }
+
+    // LinkedIn's ad iframes are not inside a <section> and have no heading.
+    // The required `title="advertisement"` (WCAG) is the stablest anchor.
     document.querySelectorAll('iframe[title="advertisement"]').forEach((iframe) => {
       const wrapper = iframe.parentElement;
       if (wrapper && !wrapper.dataset.ljProfileNoise) {
@@ -528,6 +572,13 @@ if (chrome.runtime?.id) {
     feedDoc.body.classList.toggle("lj-hide-celebrations", settings.hideCelebrations);
     feedDoc.body.classList.toggle("lj-hide-keyword-filtered", settings.feedKeywordFilterEnabled);
     feedDoc.body.classList.toggle("lj-hide-old-posts", settings.postAgeLimit > 0);
+    // The Suggestions & Ads toggle covers both /feed/ (LinkedIn News, Today's
+    // puzzles, ads) and /in/* (Suggested for you, recommendations, ads).
+    // Wrapper marking happens in scanPosts() for feed; bootProfile() handles profile.
+    feedDoc.body.classList.toggle(
+      "lj-hide-profile-suggestions",
+      settings.hideProfileSuggestions
+    );
   }
 
   // Only re-scan when actual settings change, not stats writes

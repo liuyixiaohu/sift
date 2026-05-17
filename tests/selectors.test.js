@@ -68,6 +68,16 @@ function findNoiseWrapper(headingEl) {
 describe("Profile page selectors", () => {
   const doc = parseFixture("profile-page.html");
 
+  it("<main> has NO role='main' attribute (feedMain fallback path)", () => {
+    // Real LinkedIn DOM dropped role="main" from <main>. feed.js#feedMain
+    // queries `main[role="main"]` first, then falls back to plain `main`.
+    // The fallback is load-bearing — without it, the whole feature stack
+    // never gets a container.
+    const mainEl = doc.querySelector("main");
+    expect(mainEl).toBeTruthy();
+    expect(mainEl.getAttribute("role")).toBeNull();
+  });
+
   it("finds Analytics widget heading as h2 leaf", () => {
     // PROFILE_ANALYTICS_HEADINGS marker depends on this.
     const heading = findLeafHeadingWith(doc, "Analytics");
@@ -75,10 +85,22 @@ describe("Profile page selectors", () => {
     expect(heading.tagName).toBe("H2");
   });
 
-  it("finds Suggested for you heading", () => {
-    // PROFILE_NOISE_HEADINGS marker depends on this.
+  it("finds Suggested for you heading inside Primary content section", () => {
+    // PROFILE_NOISE_HEADINGS marker depends on this. Important: "Suggested
+    // for you" lives in `<section aria-label="Primary content">` (the main
+    // profile wrapper), NOT in the aside. Don't assume it's in the right rail.
     const heading = findLeafHeadingWith(doc, "Suggested for you");
     expect(heading).toBeTruthy();
+    expect(heading.closest('section[aria-label="Primary content"]')).toBeTruthy();
+  });
+
+  it("People you may know lives in the inner <aside>, not Primary content", () => {
+    // Different from Suggested-for-you. The aside is INSIDE main on the
+    // profile page (LinkedIn's actual nesting).
+    const heading = findLeafHeadingWith(doc, "People you may know");
+    expect(heading).toBeTruthy();
+    expect(heading.closest("aside")).toBeTruthy();
+    expect(heading.closest("main")).toBeTruthy(); // aside is inside main
   });
 
   it("Analytics heading is wrapped by a <section> (closest walk)", () => {
@@ -88,11 +110,14 @@ describe("Profile page selectors", () => {
     expect(wrapper.tagName).toBe("SECTION");
   });
 
-  it("/dashboard anchor still exists for URL-based Analytics rule", () => {
-    // The legacy CSS rule keys on this; we keep both this + the JS marker
-    // as a parallel safety net.
-    const links = doc.querySelectorAll('a[href*="/dashboard"]');
-    expect(links.length).toBeGreaterThan(0);
+  it("Analytics section has BOTH /dashboard AND /analytics anchors", () => {
+    // LinkedIn is mid-rollout from /dashboard to /analytics; the current
+    // cohort has both. The CSS rule keys on /dashboard, but the JS-marker
+    // heading-text fallback (PR #43) future-proofs against the day
+    // LinkedIn drops /dashboard entirely.
+    const analyticsSection = findLeafHeadingWith(doc, "Analytics").closest("section");
+    expect(analyticsSection.querySelector('a[href*="/dashboard"]')).toBeTruthy();
+    expect(analyticsSection.querySelector('a[href*="/analytics"]')).toBeTruthy();
   });
 
   it("/dashboard link lives inside the INNERMOST section (not the outer wrapper)", () => {
@@ -123,16 +148,26 @@ describe("Profile page selectors", () => {
     expect(ads.length).toBeGreaterThan(0);
   });
 
-  it("right-rail aside has aria-label (used to scope marker scan)", () => {
-    // markProfileNoise() scopes its scan to `aside[aria-label]` containers
-    // plus the main element, to avoid hammering the whole document.
-    const asides = doc.querySelectorAll("aside[aria-label]");
-    expect(asides.length).toBeGreaterThan(0);
+  it("right-rail aside uses aria-label='Aside' (LinkedIn's actual label)", () => {
+    // Captured from live DOM in 2026-05. Not "Right rail", not "Sidebar" —
+    // LinkedIn just calls the right column "Aside". markProfileNoise scopes
+    // its scan to `aside[aria-label]` to avoid hammering the whole document.
+    const aside = doc.querySelector("aside");
+    expect(aside).toBeTruthy();
+    expect(aside.getAttribute("aria-label")).toBe("Aside");
   });
 });
 
 describe("Feed sidebar selectors", () => {
   const doc = parseFixture("feed-sidebar.html");
+
+  it("right-rail aside uses aria-label='Aside' on feed page too", () => {
+    // Captured from live DOM. Both profile and feed use the same "Aside"
+    // label for the right rail. (Feed page also has a second aside,
+    // aria-label="Sidebar", but the marker widgets live in "Aside".)
+    const aside = doc.querySelector('aside[aria-label="Aside"]');
+    expect(aside).toBeTruthy();
+  });
 
   it("LinkedIn News heading is a <p> leaf (NOT h2)", () => {
     // Feed-sidebar widgets use <p> for headings, unlike profile-page widgets
@@ -160,8 +195,10 @@ describe("Feed sidebar selectors", () => {
     const wrapper = findNoiseWrapper(news);
     expect(wrapper).toBeTruthy();
     expect(wrapper.tagName).not.toBe("SECTION");
-    // The wrapper should be a direct child of <aside>
-    expect(wrapper.parentElement.tagName).toBe("ASIDE");
+    // Wrapper should be a descendant of <aside> (the up-walk lands on the
+    // last div before aside, not necessarily a direct child — real DOM has
+    // multiple intermediate divs).
+    expect(wrapper.closest("aside")).toBeTruthy();
   });
 });
 
@@ -181,23 +218,45 @@ describe("Feed post type labels", () => {
     expect(suggested).toBeTruthy();
   });
 
-  it("feed posts live inside [role='list'] > [data-display-contents]", () => {
+  it("feed posts live inside [role='list'] > [data-display-contents] (direct child)", () => {
     // LinkedIn's 2026 DOM. feed.js#feedPosts queries this primarily and
-    // falls back to legacy [role="article"]. If this fixture stops
-    // matching the primary, we know to revisit the fallback chain.
+    // falls back to legacy [role="article"]. The :scope > direct-child
+    // match is precise — without it, deeply nested [data-display-contents]
+    // descendants (LinkedIn uses 254+ of those!) would all get treated
+    // as posts.
     const doc = parseFixture("feed-post-promoted.html");
     const list = doc.querySelector('[role="list"]');
     expect(list).toBeTruthy();
-    const posts = list.querySelectorAll(":scope > [data-display-contents]");
-    expect(posts.length).toBeGreaterThan(0);
+    const directChildren = list.querySelectorAll(":scope > [data-display-contents]");
+    expect(directChildren.length).toBeGreaterThan(0);
+  });
+
+  it("Post wrapper contains a [role='listitem'] several divs deep", () => {
+    // Real DOM nests [role="listitem"] inside the outer [data-display-contents]
+    // wrapper with multiple intermediate divs. The "Promoted" label leaf is
+    // found by a deep `span,a,p` traversal — no assumption about depth.
+    const doc = parseFixture("feed-post-promoted.html");
+    const post = doc.querySelector('[role="list"] > [data-display-contents]');
+    expect(post.querySelector('[role="listitem"]')).toBeTruthy();
   });
 
   it("Promoted post has a Follow button (used for non-connection detection)", () => {
     // Posts from companies/strangers expose a "Follow" button. The
-    // scanPosts code uses `button[aria-label*="Follow"]` for the
-    // non-connection signal.
+    // scanPosts code uses `button[aria-label*="Follow"]` (substring match,
+    // not exact) — LinkedIn's real label is "Follow <name>".
     const doc = parseFixture("feed-post-promoted.html");
     const followBtn = doc.querySelector('button[aria-label*="Follow"]');
     expect(followBtn).toBeTruthy();
+    // Confirm we're matching "Follow X" via substring, not exactly "Follow"
+    expect(followBtn.getAttribute("aria-label").startsWith("Follow")).toBe(true);
+  });
+
+  it("Promoted post has a control-menu button (Unfollow injection anchor)", () => {
+    // The Unfollow button injected by Sift clicks `button[aria-label*="control menu"]`
+    // to open LinkedIn's per-post dropdown. Real label is "Open control menu
+    // for this post".
+    const doc = parseFixture("feed-post-promoted.html");
+    const menuBtn = doc.querySelector('button[aria-label*="control menu"]');
+    expect(menuBtn).toBeTruthy();
   });
 });

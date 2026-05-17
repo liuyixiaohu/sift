@@ -1,50 +1,72 @@
 <!--
-  Feed page (/feed/) right-sidebar fixture.
+  Feed-page (/feed/) right-sidebar fixture — calibrated against live LinkedIn
+  DOM (captured 2026-05).
 
-  Unlike profile-page widgets which use <h2>/<h3>, feed sidebar widgets use
-  <p> for headings. PROFILE_NOISE_HEADINGS scan handles both via the
-  `"h1, h2, h3, h4, p"` query in markProfileNoise().
+  KEY REAL-WORLD DETAILS:
 
-  Key things to assert:
-  1. <p>LinkedIn News</p> — leaf paragraph as widget heading (no <h2>)
-  2. <p>Today’s puzzles</p> — uses CURLY apostrophe (U+2019); ASCII '
-     would silently miss the match.
-  3. Widget wrappers are direct children of <aside>, with NO surrounding
-     <section> — findNoiseWrapper falls back to walking up until parent is
-     <aside>/<main>/<body>.
-  4. <iframe title="advertisement"> ad placement — same anchor as profile.
+  1. Two asides exist on the feed page: `aria-label="Sidebar"` (left/profile
+     summary) and `aria-label="Aside"` (right rail, news/puzzles/ads). The
+     widgets we want to mark live in "Aside", not "Sidebar".
+
+  2. The widget headings are <p> leaves (not <h2>). This is the reason
+     markProfileNoise's selector list includes <p> alongside <h1>-<h4>.
+
+  3. "Today's puzzles" uses CURLY apostrophe U+2019. ASCII ' would not match.
+
+  4. Real DOM has ~7 layers of nested <div> between the heading <p> and the
+     aside. We include 4 here — enough for findNoiseWrapper's up-walk to
+     exercise multiple iterations.
+
+  5. No <section> wrappers around these widgets — bare <div> chains. This is
+     what forces the up-walk in findNoiseWrapper (instead of just closest).
 -->
 <!doctype html>
 <html lang="en">
   <body>
-    <main role="main">
+    <main>
       <div role="list">
-        <div data-display-contents>
-          <article>
-            <p>Some feed post here.</p>
-          </article>
+        <div data-display-contents="true">
+          <div>
+            <div role="listitem">
+              <p>Sample feed post body.</p>
+            </div>
+          </div>
         </div>
       </div>
     </main>
 
-    <aside aria-label="Right sidebar">
-      <!-- Widget WITHOUT <section> wrapper — common on feed page -->
-      <div class="news-widget">
-        <p>LinkedIn News</p>
-        <ul>
-          <li>Headline 1</li>
-          <li>Headline 2</li>
-        </ul>
+    <aside aria-label="Aside">
+      <!-- Widget WITHOUT <section> wrapper — nested div chain (real DOM) -->
+      <div>
+        <div>
+          <div>
+            <div>
+              <p>LinkedIn News</p>
+              <ul>
+                <li>Headline 1</li>
+                <li>Headline 2</li>
+              </ul>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="puzzles-widget">
-        <!-- NOTE: curly apostrophe (U+2019), not ASCII ' -->
-        <p>Today’s puzzles</p>
-        <a href="/games/">Play now</a>
+      <div>
+        <div>
+          <div>
+            <div>
+              <!-- CURLY apostrophe U+2019 — LinkedIn uses this consistently -->
+              <p>Today’s puzzles</p>
+              <a href="/games/example">Play now</a>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="ad-wrapper">
-        <iframe title="advertisement" src="about:blank"></iframe>
+      <div>
+        <div>
+          <iframe title="advertisement" src="about:blank"></iframe>
+        </div>
       </div>
     </aside>
   </body>

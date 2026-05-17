@@ -1,23 +1,28 @@
 <!--
-  Feed post fixture — "Suggested" post (LinkedIn recommends to follow).
+  Feed-post fixture: a "Suggested" article — same structural shape as the
+  Promoted fixture but with a different leaf label.
 
-  Same structural pattern as the Promoted fixture but with "Suggested"
-  as the leaf label. Used to verify our type-label detection handles each
-  of POST_TYPE_LABELS, not just Promoted.
+  The "Suggested" label is a leaf <span> with EXACT text "Suggested" (not
+  "Suggested for you" — that's the profile-widget heading, a different thing).
 -->
 <!doctype html>
 <html lang="en">
   <body>
-    <main role="main">
+    <main>
       <div role="list">
-        <div data-display-contents>
-          <article>
-            <header>
-              <a href="/in/example-user/"><span>Example User</span></a>
-              <span>Suggested</span>
-            </header>
-            <p>This is a suggested post body.</p>
-          </article>
+        <div data-display-contents="true">
+          <div>
+            <div role="listitem">
+              <div>
+                <header>
+                  <a href="/in/example"><span>Example User</span></a>
+                  <p><span>Suggested</span></p>
+                </header>
+                <p>Sample suggested post body.</p>
+                <button aria-label="Follow Example User">Follow</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </main>

@@ -1,4 +1,5 @@
 import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
+import { relevantCountsFor } from "./shared/diag.js";
 import { addUnique, removeCi } from "./shared/lists.js";
 import {
   estimateBytes,
@@ -245,33 +246,13 @@ import {
     other: "Other",
   };
 
-  // Build the chip list for the current page type. Only show items with
-  // non-zero counts; an all-zero page renders "nothing detected yet".
-  function relevantCountsFor(diag) {
-    const items = [];
-    const push = (label, n) => { if (n > 0) items.push({ label, n }); };
-    if (diag.pageType === "feed") {
-      push("Ads", diag.feed.promoted);
-      push("Suggested", diag.feed.suggested);
-      push("Recommended", diag.feed.recommended);
-      push("Strangers", diag.feed.nonConnection);
-      push("Polls", diag.feed.poll);
-      push("Celebrations", diag.feed.celebration);
-      push("Keywords", diag.feed.keywordFiltered);
-      push("Too old", diag.feed.tooOld);
-      push("Sidebar widgets", diag.profile.noise);
-    } else if (diag.pageType === "profile") {
-      push("Analytics", diag.profile.analytics);
-      push("Suggestion widgets", diag.profile.noise);
-    } else if (diag.pageType === "jobs") {
-      push("Flagged jobs", diag.jobs.flagged);
-    } else if (diag.pageType === "network") {
-      push("Hidden widgets", diag.profile.noise);
-    }
-    return items;
-  }
+  // `relevantCountsFor` lives in src/shared/diag.js so the warning logic is
+  // unit-testable (see tests/diag.test.js). It now returns items with a
+  // `severity` field ("ok" or "warn") — "warn" fires when a toggle is ON,
+  // the page type is relevant, but Sift sees ZERO matches. That's the
+  // "your selector might have broken" signal.
 
-  function buildDiagnosticPanel(container) {
+  function buildDiagnosticPanel(container, settings) {
     const wrap = document.createElement("div");
     wrap.className = "diag-panel";
     wrap.dataset.state = "loading";
@@ -311,11 +292,13 @@ import {
       pill.className = "diag-page";
       pill.textContent = DIAG_PAGE_LABELS[diag.pageType] || diag.pageType;
       body.appendChild(pill);
-      const items = relevantCountsFor(diag);
+      const items = relevantCountsFor(diag, settings);
       if (items.length === 0) {
         const none = document.createElement("span");
         none.className = "diag-message";
-        none.textContent = " · nothing detected yet";
+        none.textContent = diag.paused
+          ? " · paused"
+          : " · nothing detected yet";
         body.appendChild(none);
         return;
       }
@@ -326,7 +309,15 @@ import {
       items.forEach(function (item, i) {
         const chip = document.createElement("span");
         chip.className = "diag-chip";
-        chip.textContent = item.n + " " + item.label;
+        chip.dataset.severity = item.severity;
+        if (item.severity === "warn") {
+          chip.textContent = "⚠ 0 " + item.label;
+          chip.title =
+            item.label +
+            " filter is ON but Sift saw 0 matches on this page — LinkedIn DOM may have changed.";
+        } else {
+          chip.textContent = item.n + " " + item.label;
+        }
         body.appendChild(chip);
         if (i < items.length - 1) {
           const comma = document.createElement("span");
@@ -410,7 +401,7 @@ import {
     container.innerHTML = "";
 
     buildPauseRow(container, !!settings.siftPaused);
-    buildDiagnosticPanel(container);
+    buildDiagnosticPanel(container, settings);
 
     // --- Feed Controls ---
     let feedGroup = document.createElement("div");

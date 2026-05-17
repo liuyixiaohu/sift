@@ -9,7 +9,6 @@
     hideSuggested: true,
     hideRecommended: true,
     hideNonConnections: false,
-    hideSidebar: true,
     hidePolls: false,
     hideCelebrations: false,
     feedKeywordFilterEnabled: true,

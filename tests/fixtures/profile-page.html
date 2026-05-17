@@ -1,0 +1,70 @@
+<!--
+  Minimal but structurally accurate profile-page fixture.
+
+  Anchors we assert against (and which feature relies on each):
+
+  1. Outer <section aria-label="Primary content"> wraps inner sections.
+     The CSS rule `body.lj-hide-profile-analytics
+     section:has(a[href*="/dashboard"]):not(:has(section a[href*="/dashboard"]))`
+     depends on Analytics being an INNER section inside this outer one.
+     (See feed.css "Hide Analytics" rule; the :not(:has(...)) clause exists
+     specifically to avoid the outer match.)
+
+  2. Inner <section> with <h2>Analytics</h2> + <a href=".../dashboard/">.
+     - URL-based hide depends on the /dashboard link
+     - JS-marker heading-text fallback (PR #43) depends on the leaf <h2>"Analytics"
+
+  3. Inner <section> with <h2>Suggested for you</h2> heading.
+     hideProfileSuggestions hooks the PROFILE_NOISE_HEADINGS marker on this.
+
+  4. <aside aria-label="Right rail"> with widget sections "People you may know"
+     and "You might like". Same marker mechanism.
+
+  5. <iframe title="advertisement"> — WCAG-required attribute used as the
+     stablest anchor for ads (see learning_linkedin_dom_anchors).
+-->
+<!doctype html>
+<html lang="en">
+  <body>
+    <main>
+      <section aria-label="Primary content">
+        <!-- Analytics widget (innermost section with /dashboard link) -->
+        <section>
+          <h2>Analytics</h2>
+          <p>Private to you</p>
+          <a href="/in/kun-l/dashboard/">View all analytics</a>
+        </section>
+
+        <!-- Suggested for you widget -->
+        <section>
+          <h2>Suggested for you</h2>
+          <p>Based on your profile</p>
+          <button>Add skills</button>
+        </section>
+
+        <!-- Real profile content (should NOT be hidden) -->
+        <section>
+          <h2>About</h2>
+          <p>Real bio content here.</p>
+        </section>
+      </section>
+    </main>
+
+    <aside aria-label="Right rail">
+      <section>
+        <h2>People you may know</h2>
+        <p>Based on your profile</p>
+      </section>
+
+      <section>
+        <h2>You might like</h2>
+        <p>Newsletters and pages</p>
+      </section>
+
+      <!-- Ad iframe inside aside (typical placement) -->
+      <div class="ad-wrapper">
+        <iframe title="advertisement" src="about:blank"></iframe>
+      </div>
+    </aside>
+  </body>
+</html>

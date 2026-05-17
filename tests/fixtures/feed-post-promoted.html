@@ -1,0 +1,31 @@
+<!--
+  Feed post fixture — a single "Promoted" article.
+
+  LinkedIn's 2026 DOM uses div[data-display-contents] inside [role="list"]
+  for posts (not [role="article"] anymore — see feed.js#feedPosts which
+  falls back to the legacy selector for older layouts).
+
+  Type labels ("Promoted", "Suggested", etc.) are rendered as leaf
+  <span>/<a>/<p> elements inside the post. detectPostLabels(article) walks
+  all leaves looking for an exact text match against POST_TYPE_LABELS.
+-->
+<!doctype html>
+<html lang="en">
+  <body>
+    <main role="main">
+      <div role="list">
+        <div data-display-contents>
+          <article>
+            <header>
+              <a href="/company/example/"><span>Example Co.</span></a>
+              <!-- The "Promoted" label — leaf <span> with exact text -->
+              <span>Promoted</span>
+            </header>
+            <p>This is the promoted post body content.</p>
+            <button aria-label="Follow Example Co.">Follow</button>
+          </article>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

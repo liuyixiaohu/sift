@@ -1,0 +1,51 @@
+<!--
+  Feed page (/feed/) right-sidebar fixture.
+
+  Unlike profile-page widgets which use <h2>/<h3>, feed sidebar widgets use
+  <p> for headings. PROFILE_NOISE_HEADINGS scan handles both via the
+  `"h1, h2, h3, h4, p"` query in markProfileNoise().
+
+  Key things to assert:
+  1. <p>LinkedIn News</p> — leaf paragraph as widget heading (no <h2>)
+  2. <p>Today’s puzzles</p> — uses CURLY apostrophe (U+2019); ASCII '
+     would silently miss the match.
+  3. Widget wrappers are direct children of <aside>, with NO surrounding
+     <section> — findNoiseWrapper falls back to walking up until parent is
+     <aside>/<main>/<body>.
+  4. <iframe title="advertisement"> ad placement — same anchor as profile.
+-->
+<!doctype html>
+<html lang="en">
+  <body>
+    <main role="main">
+      <div role="list">
+        <div data-display-contents>
+          <article>
+            <p>Some feed post here.</p>
+          </article>
+        </div>
+      </div>
+    </main>
+
+    <aside aria-label="Right sidebar">
+      <!-- Widget WITHOUT <section> wrapper — common on feed page -->
+      <div class="news-widget">
+        <p>LinkedIn News</p>
+        <ul>
+          <li>Headline 1</li>
+          <li>Headline 2</li>
+        </ul>
+      </div>
+
+      <div class="puzzles-widget">
+        <!-- NOTE: curly apostrophe (U+2019), not ASCII ' -->
+        <p>Today’s puzzles</p>
+        <a href="/games/">Play now</a>
+      </div>
+
+      <div class="ad-wrapper">
+        <iframe title="advertisement" src="about:blank"></iframe>
+      </div>
+    </aside>
+  </body>
+</html>

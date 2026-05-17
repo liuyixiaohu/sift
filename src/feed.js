@@ -50,7 +50,7 @@ if (chrome.runtime?.id) {
 
   // === Storage ===
   const DEFAULTS = SIFT_DEFAULTS;
-  const SETTING_KEYS = new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywords", "postAgeLimit", "hideProfileAnalytics"]);
+  const SETTING_KEYS = new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywords", "postAgeLimit", "hideProfileAnalytics", "hideProfileSuggestions"]);
   let settings = { ...DEFAULTS };
 
   function loadSettings(cb) {
@@ -410,24 +410,78 @@ if (chrome.runtime?.id) {
     if (tip && tip.classList.contains("visible")) updateBreakdown();
   }
 
-  // === Profile page: apply sidebar + analytics body classes ===
+  // === Profile page: apply sidebar + analytics + suggestions body classes ===
   let profileInitialized = false;
+  let profileNoiseRetryTimer = null;
+
+  // Heading texts (from <h2> or <h3> at the top of each section) that mark a
+  // profile-page widget as "noise". CSS can't match on text content, so we
+  // tag matching sections with `data-lj-profile-noise="true"` and let CSS hide
+  // by attribute. Locale-fragile (English-LinkedIn only) — see project memory.
+  const PROFILE_NOISE_HEADINGS = new Set([
+    "Suggested for you", // middle column on the OWNER's profile (skills prompt, etc.)
+    "Who your viewers also viewed", // Premium widget in the right column
+    "People you may know", // right column
+    "You might like", // right column
+  ]);
+
+  function markProfileNoise() {
+    document.querySelectorAll("section").forEach((s) => {
+      if (s.dataset.ljProfileNoise) return;
+      // First heading inside the section identifies it. Don't walk into nested
+      // popups (e.g. the <dialog> with "Ad Options" inside Premium widgets) —
+      // querySelector returns the first heading in document order which is the
+      // section's own title.
+      const h = s.querySelector("h2, h3");
+      if (!h) return;
+      const text = (h.textContent || "").trim();
+      if (PROFILE_NOISE_HEADINGS.has(text)) {
+        s.dataset.ljProfileNoise = "true";
+      }
+    });
+    // Also mark direct wrappers of LinkedIn's ad iframes — they're not in a
+    // <section>, but the iframe has the required `title="advertisement"`
+    // accessibility attribute, which is structurally stable.
+    document.querySelectorAll('iframe[title="advertisement"]').forEach((iframe) => {
+      const wrapper = iframe.parentElement;
+      if (wrapper && !wrapper.dataset.ljProfileNoise) {
+        wrapper.dataset.ljProfileNoise = "true";
+      }
+    });
+  }
 
   function applyProfileClasses() {
     document.body.classList.toggle("lj-hide-sidebar", settings.hideSidebar);
     document.body.classList.toggle("lj-hide-profile-analytics", settings.hideProfileAnalytics);
+    document.body.classList.toggle(
+      "lj-hide-profile-suggestions",
+      settings.hideProfileSuggestions
+    );
+    markProfileNoise();
   }
 
   function bootProfile() {
     if (profileInitialized) return;
     profileInitialized = true;
-    loadSettings(() => applyProfileClasses());
+    loadSettings(() => {
+      applyProfileClasses();
+      // LinkedIn lazy-loads the right-column widgets after first paint. Retry
+      // the marker a few times to catch sections that weren't in the DOM yet.
+      [500, 1500, 3000, 6000].forEach((delay) => {
+        setTimeout(markProfileNoise, delay);
+      });
+    });
   }
 
   function teardownProfile() {
     if (!profileInitialized) return;
     profileInitialized = false;
-    document.body.classList.remove("lj-hide-sidebar", "lj-hide-profile-analytics");
+    document.body.classList.remove(
+      "lj-hide-sidebar",
+      "lj-hide-profile-analytics",
+      "lj-hide-profile-suggestions"
+    );
+    if (profileNoiseRetryTimer) clearTimeout(profileNoiseRetryTimer);
   }
 
   // === Network page: hide sidebar ad + game promo ===

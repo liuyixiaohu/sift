@@ -19,6 +19,7 @@
     hasSeenOnboarding: false,
     // Profile page
     hideProfileAnalytics: true,
+    hideProfileSuggestions: true,
     // Jobs page
     sponsorCheckEnabled: true,
     unpaidCheckEnabled: true,
@@ -375,17 +376,48 @@
       badge.textContent = count > 0 ? "\u{1F50D} " + count + " filtered" : "\u{1F50D} Sift";
       const tip = feedDoc.getElementById("lj-badge-tip");
       if (tip && tip.classList.contains("visible")) updateBreakdown();
+    }, markProfileNoise = function() {
+      document.querySelectorAll("section").forEach((s) => {
+        if (s.dataset.ljProfileNoise) return;
+        const h = s.querySelector("h2, h3");
+        if (!h) return;
+        const text = (h.textContent || "").trim();
+        if (PROFILE_NOISE_HEADINGS.has(text)) {
+          s.dataset.ljProfileNoise = "true";
+        }
+      });
+      document.querySelectorAll('iframe[title="advertisement"]').forEach((iframe) => {
+        const wrapper = iframe.parentElement;
+        if (wrapper && !wrapper.dataset.ljProfileNoise) {
+          wrapper.dataset.ljProfileNoise = "true";
+        }
+      });
     }, applyProfileClasses = function() {
       document.body.classList.toggle("lj-hide-sidebar", settings.hideSidebar);
       document.body.classList.toggle("lj-hide-profile-analytics", settings.hideProfileAnalytics);
+      document.body.classList.toggle(
+        "lj-hide-profile-suggestions",
+        settings.hideProfileSuggestions
+      );
+      markProfileNoise();
     }, bootProfile = function() {
       if (profileInitialized) return;
       profileInitialized = true;
-      loadSettings(() => applyProfileClasses());
+      loadSettings(() => {
+        applyProfileClasses();
+        [500, 1500, 3e3, 6e3].forEach((delay) => {
+          setTimeout(markProfileNoise, delay);
+        });
+      });
     }, teardownProfile = function() {
       if (!profileInitialized) return;
       profileInitialized = false;
-      document.body.classList.remove("lj-hide-sidebar", "lj-hide-profile-analytics");
+      document.body.classList.remove(
+        "lj-hide-sidebar",
+        "lj-hide-profile-analytics",
+        "lj-hide-profile-suggestions"
+      );
+      if (profileNoiseRetryTimer) clearTimeout(profileNoiseRetryTimer);
     }, hideNetworkAds = function() {
       const adIframe = document.querySelector('iframe[src="about:blank"]');
       if (adIframe) {
@@ -557,7 +589,7 @@
     let initialized = false;
     let feedDoc = document;
     const DEFAULTS = SIFT_DEFAULTS;
-    const SETTING_KEYS = /* @__PURE__ */ new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywords", "postAgeLimit", "hideProfileAnalytics"]);
+    const SETTING_KEYS = /* @__PURE__ */ new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hideSidebar", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywords", "postAgeLimit", "hideProfileAnalytics", "hideProfileSuggestions"]);
     let settings = { ...DEFAULTS };
     const POST_TYPE_LABELS = /* @__PURE__ */ new Set([
       "Promoted",
@@ -586,6 +618,17 @@
     let pendingStats = {};
     let toastTimer = null;
     let profileInitialized = false;
+    let profileNoiseRetryTimer = null;
+    const PROFILE_NOISE_HEADINGS = /* @__PURE__ */ new Set([
+      "Suggested for you",
+      // middle column on the OWNER's profile (skills prompt, etc.)
+      "Who your viewers also viewed",
+      // Premium widget in the right column
+      "People you may know",
+      // right column
+      "You might like"
+      // right column
+    ]);
     let networkInitialized = false;
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;

@@ -255,6 +255,15 @@ body {
   cursor: help;
 }
 
+/* User-error chip: zero matches, but the cause is the user's own input
+ * (today: an invalid regex). Distinct color from `warn` so the user can
+ * see at a glance "fix me" vs. "Sift might be broken". */
+.diag-chip[data-severity="userError"] {
+  color: #7B6F4D;
+  font-weight: 600;
+  cursor: help;
+}
+
 .diag-sep {
   color: #B4ADA1;
 }

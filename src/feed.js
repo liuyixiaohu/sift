@@ -1,5 +1,9 @@
 import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
-import { matchesFeedKeyword, parsePostAgeDays } from "./shared/matching.js";
+import {
+  matchesFeedKeyword,
+  parsePostAgeDays,
+  validateKeywords,
+} from "./shared/matching.js";
 
 if (chrome.runtime?.id) {
   "use strict";
@@ -642,6 +646,14 @@ if (chrome.runtime?.id) {
     // feed there; everything else lives in the top-frame document.
     const feedQ = (sel) => feedDoc.querySelectorAll(sel).length;
     const topQ = (sel) => document.querySelectorAll(sel).length;
+    // Surface "user typed an invalid regex" so the popup can show a distinct
+    // chip instead of the misleading "selector broken" warning when the
+    // Keywords count is zero.
+    const keywordMode = settings.feedKeywordMatchMode || "substring";
+    const { invalid: invalidKws } = validateKeywords(
+      settings.feedKeywords || [],
+      keywordMode
+    );
     return {
       url: location.href,
       pageType: detectPageType(),
@@ -663,12 +675,26 @@ if (chrome.runtime?.id) {
       jobs: {
         flagged: topQ("[data-lj-reasons]"),
       },
+      // > 0 means the user's regex keywords are unusable. The popup uses
+      // this to suppress the false "DOM may have changed" warning and
+      // instead point the user at their broken input.
+      invalidKeywords: invalidKws.length,
     };
   }
 
   chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     if (msg?.type !== "SIFT_DIAG") return false;
-    sendResponse(collectDiagnostics());
+    // Wrap in try/catch — if e.g. feedDoc was invalidated (iframe unmounted)
+    // between scans, querySelectorAll throws and the listener would otherwise
+    // exit without responding, leaving the popup stuck on "Loading…" while
+    // chrome.runtime.lastError reports the unhelpful "message port closed".
+    // Returning an `error` field lets the popup render something specific.
+    try {
+      sendResponse(collectDiagnostics());
+    } catch (err) {
+      console.warn("[Sift] collectDiagnostics threw:", err);
+      sendResponse({ error: err?.message || String(err) });
+    }
     return false; // response sent synchronously
   });
 

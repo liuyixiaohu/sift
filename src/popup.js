@@ -1,6 +1,7 @@
 import { SIFT_DEFAULTS, SIFT_STATS_DEFAULTS } from "./shared/defaults.js";
 import { relevantCountsFor } from "./shared/diag.js";
 import { addUnique, removeCi } from "./shared/lists.js";
+import { validateKeywords } from "./shared/matching.js";
 import {
   estimateBytes,
   formatBytes,
@@ -315,6 +316,13 @@ import {
           chip.title =
             item.label +
             " filter is ON but Sift saw 0 matches on this page — LinkedIn DOM may have changed.";
+        } else if (item.severity === "userError") {
+          // The user's input is the cause, not LinkedIn. Different tooltip
+          // so they fix the right thing.
+          chip.textContent = "⚠ " + item.n + " " + item.label;
+          chip.title =
+            "One or more keywords don't compile as regex. Switch Match Mode " +
+            "or fix the patterns to use the Keywords filter.";
         } else {
           chip.textContent = item.n + " " + item.label;
         }
@@ -337,10 +345,34 @@ import {
           return;
         }
         chrome.tabs.sendMessage(tab.id, { type: "SIFT_DIAG" }, function (diag) {
-          // lastError fires when the content script isn't loaded — usually a
-          // LinkedIn tab that hasn't refreshed since install/update.
-          if (chrome.runtime.lastError || !diag) {
-            renderMessage("error", "Reload the LinkedIn tab to see diagnostics");
+          // Distinguish error modes so the message we show actually maps to
+          // the root cause. Three distinct cases:
+          //   1. "Could not establish connection" — content script not loaded
+          //      on this tab. Reload advice is correct.
+          //   2. Any other lastError (e.g. "port closed before response")
+          //      — content script likely threw mid-response. Reload won't
+          //      help; point the user at the console.
+          //   3. Listener returned an `error` field — collectDiagnostics
+          //      caught an exception. Same: console-based debugging.
+          const err = chrome.runtime.lastError;
+          if (err) {
+            const msg = err.message || "";
+            if (msg.indexOf("Could not establish connection") !== -1) {
+              renderMessage("error", "Reload the LinkedIn tab to see diagnostics");
+            } else {
+              console.warn("[Sift] diag sendMessage error:", msg);
+              renderMessage("error", "Diagnostics unavailable — check the console");
+            }
+            return;
+          }
+          if (!diag) {
+            console.warn("[Sift] diag response was empty");
+            renderMessage("error", "Diagnostics unavailable — check the console");
+            return;
+          }
+          if (diag.error) {
+            console.warn("[Sift] content-script diag threw:", diag.error);
+            renderMessage("error", "Diagnostics error: " + diag.error);
             return;
           }
           renderDiag(diag);
@@ -546,13 +578,34 @@ import {
           return s.trim();
         })
         .filter(Boolean);
+      // Validate against the active match mode BEFORE writing storage.
+      // In regex mode, an unterminated group or bad escape would otherwise be
+      // accepted silently and then the diag panel would falsely accuse
+      // LinkedIn DOM of having changed (since 0 posts match a regex that
+      // doesn't compile).
+      const currentMode = settings.feedKeywordMatchMode || "substring";
+      const { valid, invalid } = validateKeywords(newKws, currentMode);
       let added = 0;
-      newKws.forEach(function (kw) {
+      valid.forEach(function (kw) {
         if (addUnique(settings.feedKeywords, kw)) added++;
       });
       if (added > 0) {
         chrome.storage.local.set({ feedKeywords: settings.feedKeywords });
         renderFeedKw(settings.feedKeywords);
+      }
+      // Surface the result. Mixed cases (some added, some rejected) get a
+      // combined toast so the user knows exactly what made it in.
+      if (invalid.length > 0 && added > 0) {
+        showToast(
+          added + " added, " + invalid.length + " skipped (invalid regex)"
+        );
+      } else if (invalid.length > 0) {
+        showToast(
+          invalid.length === 1
+            ? "Skipped invalid regex: " + invalid[0]
+            : "Skipped " + invalid.length + " invalid regexes"
+        );
+      } else if (added > 0) {
         showToast(added + " keyword" + (added > 1 ? "s" : "") + " added");
       }
       kwInput.value = "";

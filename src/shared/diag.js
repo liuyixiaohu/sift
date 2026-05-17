@@ -2,17 +2,22 @@
 //
 // `relevantCountsFor` decides which counts to render in the popup's "On this
 // page" strip, based on (a) the diag payload from the content script and
-// (b) the user's current settings. Two severity levels:
+// (b) the user's current settings. Three severity levels:
 //
-//   "ok"   — non-zero count, the relevant toggle is ON, this page type is
-//            one where the toggle would normally fire. Renders as a normal
-//            chip.
+//   "ok"        — non-zero count, the relevant toggle is ON, this page type
+//                 is one where the toggle would normally fire. Renders as a
+//                 normal chip.
 //
-//   "warn" — ZERO count, the relevant toggle is ON, this page type is one
-//            where the toggle would normally fire, and Sift isn't paused.
-//            Renders with the ⚠ prefix and an amber tint — this is the
-//            "your selector might have broken" signal users open the popup
-//            to see.
+//   "warn"      — ZERO count, the relevant toggle is ON, this page type is
+//                 one where the toggle would normally fire, and Sift isn't
+//                 paused. Renders with the ⚠ prefix and an amber tint —
+//                 the "your selector might have broken" signal.
+//
+//   "userError" — ZERO count BUT explained by the user's own input (today,
+//                 only the Keywords chip uses this — when the user is on
+//                 regex mode and one or more keywords don't compile). The
+//                 chip points the user at their broken input instead of
+//                 falsely blaming LinkedIn's DOM.
 //
 // We omit chips when the toggle is OFF, or the page type isn't relevant
 // (e.g. Hide Polls on a profile page), or Sift is paused (counts are
@@ -63,7 +68,19 @@ export function relevantCountsFor(diag, settings) {
     push("Strangers", diag.feed.nonConnection, !!settings.hideNonConnections, true);
     push("Polls", diag.feed.poll, !!settings.hidePolls, true);
     push("Celebrations", diag.feed.celebration, !!settings.hideCelebrations, true);
-    push("Keywords", diag.feed.keywordFiltered, !!settings.feedKeywordFilterEnabled, true);
+    // Keywords gets special handling: if the user is on regex mode and one
+    // or more of their keywords doesn't compile, that's why the count is 0
+    // — point at the user's input instead of falsely accusing LinkedIn.
+    const invalidKw = diag.invalidKeywords || 0;
+    if (settings.feedKeywordFilterEnabled) {
+      if (diag.feed.keywordFiltered > 0) {
+        items.push({ label: "Keywords", n: diag.feed.keywordFiltered, severity: "ok" });
+      } else if (invalidKw > 0 && !paused) {
+        items.push({ label: "Invalid regex", n: invalidKw, severity: "userError" });
+      } else if (!paused) {
+        items.push({ label: "Keywords", n: 0, severity: "warn" });
+      }
+    }
     push("Too old", diag.feed.tooOld, (settings.postAgeLimit || 0) > 0, true);
     // hideProfileSuggestions also covers feed-page sidebar widgets (News etc.)
     push("Sidebar widgets", diag.profile.noise, !!settings.hideProfileSuggestions, true);

@@ -3,7 +3,7 @@
   var SIFT_DEFAULTS = {
     // Storage schema version — bumped via src/shared/schema.js#migrate when
     // the shape of stored data changes. New installs start at the latest.
-    schemaVersion: 1,
+    schemaVersion: 2,
     // Feed page
     hidePromoted: true,
     hideSuggested: true,
@@ -12,6 +12,10 @@
     hidePolls: false,
     hideCelebrations: false,
     feedKeywordFilterEnabled: true,
+    // Match mode for feedKeywords: "wholeWord" | "substring" | "regex".
+    // New installs get "wholeWord" — see src/shared/matching.js for semantics.
+    // Existing v1 users are migrated to "substring" to preserve behavior.
+    feedKeywordMatchMode: "wholeWord",
     feedKeywords: [],
     postAgeLimit: 0,
     // 0 = off, days threshold: 1, 3, 7, 14, 30
@@ -78,7 +82,7 @@
   }
 
   // src/shared/schema.js
-  var SCHEMA_VERSION = 1;
+  var SCHEMA_VERSION = 2;
   var STORAGE_QUOTA_BYTES = 10 * 1024 * 1024;
   var STORAGE_WARN_FRACTION = 0.8;
   var STORAGE_BLOCK_FRACTION = 0.95;
@@ -93,6 +97,7 @@
     hidePolls: "boolean",
     hideCelebrations: "boolean",
     feedKeywordFilterEnabled: "boolean",
+    feedKeywordMatchMode: "string",
     hasSeenOnboarding: "boolean",
     postAgeLimit: "number",
     feedKeywords: "string[]",
@@ -160,6 +165,12 @@
     if (v >= SCHEMA_VERSION) return data;
     if (v < 1) {
       data.schemaVersion = 1;
+    }
+    if (v < 2) {
+      if (typeof data.feedKeywordMatchMode !== "string") {
+        data.feedKeywordMatchMode = "substring";
+      }
+      data.schemaVersion = 2;
     }
     return data;
   }
@@ -525,6 +536,33 @@
           chrome.storage.local.set({ feedKeywordFilterEnabled: v });
         })
       );
+      let kwModeRow = document.createElement("div");
+      kwModeRow.className = "toggle-row";
+      let kwModeLabel = document.createElement("span");
+      kwModeLabel.className = "toggle-label";
+      kwModeLabel.textContent = "Match mode";
+      let kwModeSelect = document.createElement("select");
+      kwModeSelect.className = "age-select";
+      kwModeSelect.title = "Whole word: matches whole words only (avoids 'ai' matching 'training').\nSubstring: matches any text (legacy default).\nRegex: each keyword is a regex pattern.";
+      [
+        { value: "wholeWord", label: "Whole word" },
+        { value: "substring", label: "Substring" },
+        { value: "regex", label: "Regex" }
+      ].forEach(function(opt) {
+        let option = document.createElement("option");
+        option.value = opt.value;
+        option.textContent = opt.label;
+        if ((settings.feedKeywordMatchMode || "substring") === opt.value) {
+          option.selected = true;
+        }
+        kwModeSelect.appendChild(option);
+      });
+      kwModeSelect.addEventListener("change", function() {
+        chrome.storage.local.set({ feedKeywordMatchMode: kwModeSelect.value });
+      });
+      kwModeRow.appendChild(kwModeLabel);
+      kwModeRow.appendChild(kwModeSelect);
+      feedRules.appendChild(kwModeRow);
       let kwAddRow = document.createElement("div");
       kwAddRow.className = "list-search-row";
       let kwInput = document.createElement("input");

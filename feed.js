@@ -3,7 +3,7 @@
   var SIFT_DEFAULTS = {
     // Storage schema version — bumped via src/shared/schema.js#migrate when
     // the shape of stored data changes. New installs start at the latest.
-    schemaVersion: 1,
+    schemaVersion: 2,
     // Feed page
     hidePromoted: true,
     hideSuggested: true,
@@ -12,6 +12,10 @@
     hidePolls: false,
     hideCelebrations: false,
     feedKeywordFilterEnabled: true,
+    // Match mode for feedKeywords: "wholeWord" | "substring" | "regex".
+    // New installs get "wholeWord" — see src/shared/matching.js for semantics.
+    // Existing v1 users are migrated to "substring" to preserve behavior.
+    feedKeywordMatchMode: "wholeWord",
     feedKeywords: [],
     postAgeLimit: 0,
     // 0 = off, days threshold: 1, 3, 7, 14, 30
@@ -55,9 +59,45 @@
   };
 
   // src/shared/matching.js
-  function matchesFeedKeyword(text, keywords) {
+  function startsWithWordChar(s) {
+    return /^\w/.test(s);
+  }
+  function endsWithWordChar(s) {
+    return /\w$/.test(s);
+  }
+  function escapeRegex(s) {
+    return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+  function matchesFeedKeyword(text, keywords, mode = "substring") {
     if (!keywords || keywords.length === 0) return null;
+    if (mode === "regex") {
+      for (const kw of keywords) {
+        if (!kw) continue;
+        try {
+          if (new RegExp(kw, "i").test(text)) return kw;
+        } catch {
+        }
+      }
+      return null;
+    }
     const lower = text.toLowerCase();
+    if (mode === "wholeWord") {
+      for (const kw of keywords) {
+        if (!kw) continue;
+        const prefix = startsWithWordChar(kw) ? "\\b" : "";
+        const suffix = endsWithWordChar(kw) ? "\\b" : "";
+        if (!prefix && !suffix) {
+          if (lower.includes(kw.toLowerCase())) return kw;
+          continue;
+        }
+        try {
+          if (new RegExp(prefix + escapeRegex(kw) + suffix, "i").test(text)) return kw;
+        } catch {
+          if (lower.includes(kw.toLowerCase())) return kw;
+        }
+      }
+      return null;
+    }
     for (const kw of keywords) {
       if (kw && lower.includes(kw.toLowerCase())) return kw;
     }
@@ -212,7 +252,11 @@
         if (settings.feedKeywordFilterEnabled && settings.feedKeywords && settings.feedKeywords.length > 0) {
           if (!article.dataset.ljKeywordChecked) {
             article.dataset.ljKeywordChecked = "1";
-            const matched = matchesFeedKeyword(article.textContent, settings.feedKeywords);
+            const matched = matchesFeedKeyword(
+              article.textContent,
+              settings.feedKeywords,
+              settings.feedKeywordMatchMode || "substring"
+            );
             if (matched) {
               article.dataset.ljKeywordFiltered = "true";
               incrementStat("keywordsHidden");
@@ -610,7 +654,7 @@
     let initialized = false;
     let feedDoc = document;
     const DEFAULTS = SIFT_DEFAULTS;
-    const SETTING_KEYS = /* @__PURE__ */ new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywords", "postAgeLimit", "hideProfileAnalytics", "hideProfileSuggestions"]);
+    const SETTING_KEYS = /* @__PURE__ */ new Set(["hidePromoted", "hideSuggested", "hideRecommended", "hideNonConnections", "hidePolls", "hideCelebrations", "feedKeywordFilterEnabled", "feedKeywordMatchMode", "feedKeywords", "postAgeLimit", "hideProfileAnalytics", "hideProfileSuggestions"]);
     let settings = { ...DEFAULTS };
     const POST_TYPE_LABELS = /* @__PURE__ */ new Set([
       "Promoted",
@@ -665,7 +709,7 @@
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       if (!Object.keys(changes).some((k) => SETTING_KEYS.has(k))) return;
-      if ("feedKeywords" in changes || "feedKeywordFilterEnabled" in changes) {
+      if ("feedKeywords" in changes || "feedKeywordFilterEnabled" in changes || "feedKeywordMatchMode" in changes) {
         clearPostMarks("ljKeywordChecked", "ljKeywordFiltered");
       }
       if ("postAgeLimit" in changes) {

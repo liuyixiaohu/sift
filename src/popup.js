@@ -435,6 +435,40 @@ import {
       })
     );
 
+    // Match mode dropdown — controls how each keyword is compared against
+    // post text. "Whole word" is the new default; existing users were
+    // migrated to "Substring" by schema v1→v2 to preserve behavior.
+    let kwModeRow = document.createElement("div");
+    kwModeRow.className = "toggle-row";
+    let kwModeLabel = document.createElement("span");
+    kwModeLabel.className = "toggle-label";
+    kwModeLabel.textContent = "Match mode";
+    let kwModeSelect = document.createElement("select");
+    kwModeSelect.className = "age-select";
+    kwModeSelect.title =
+      "Whole word: matches whole words only (avoids 'ai' matching 'training').\n" +
+      "Substring: matches any text (legacy default).\n" +
+      "Regex: each keyword is a regex pattern.";
+    [
+      { value: "wholeWord", label: "Whole word" },
+      { value: "substring", label: "Substring" },
+      { value: "regex", label: "Regex" },
+    ].forEach(function (opt) {
+      let option = document.createElement("option");
+      option.value = opt.value;
+      option.textContent = opt.label;
+      if ((settings.feedKeywordMatchMode || "substring") === opt.value) {
+        option.selected = true;
+      }
+      kwModeSelect.appendChild(option);
+    });
+    kwModeSelect.addEventListener("change", function () {
+      chrome.storage.local.set({ feedKeywordMatchMode: kwModeSelect.value });
+    });
+    kwModeRow.appendChild(kwModeLabel);
+    kwModeRow.appendChild(kwModeSelect);
+    feedRules.appendChild(kwModeRow);
+
     // Keyword add input
     let kwAddRow = document.createElement("div");
     kwAddRow.className = "list-search-row";

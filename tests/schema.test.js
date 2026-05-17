@@ -132,6 +132,31 @@ describe("migrate", () => {
     const migrated = migrate(future);
     expect(migrated.schemaVersion).toBe(SCHEMA_VERSION + 99);
   });
+
+  it("v1 → v2 pins existing users to 'substring' to preserve behavior", () => {
+    // Existing users on schemaVersion 1 had only substring matching
+    // available, so migrating them to "wholeWord" would silently change
+    // what gets filtered. Pin to "substring" to avoid the surprise.
+    const v1 = { schemaVersion: 1, feedKeywords: ["ai"] };
+    const migrated = migrate(v1);
+    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.feedKeywordMatchMode).toBe("substring");
+  });
+
+  it("v1 → v2 respects an explicit feedKeywordMatchMode if already set", () => {
+    // Edge case: a v1 export that already includes the new field (e.g. a
+    // partial migration). Don't overwrite the explicit value.
+    const v1 = { schemaVersion: 1, feedKeywordMatchMode: "regex" };
+    const migrated = migrate(v1);
+    expect(migrated.feedKeywordMatchMode).toBe("regex");
+  });
+
+  it("v0 → v2 (no schemaVersion field) goes through both migration steps", () => {
+    const v0 = { feedKeywords: ["ai"] };
+    const migrated = migrate(v0);
+    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.feedKeywordMatchMode).toBe("substring");
+  });
 });
 
 describe("estimateBytes / formatBytes", () => {

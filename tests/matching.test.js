@@ -60,4 +60,70 @@ describe("matchesFeedKeyword", () => {
   it("skips empty keyword strings", () => {
     expect(matchesFeedKeyword("hello world", ["", "world"])).toBe("world");
   });
+
+  // The default behavior (no `mode` argument) is "substring" — preserves
+  // the original API for any caller that hasn't been updated.
+  it("defaults to substring mode when no mode is given", () => {
+    expect(matchesFeedKeyword("I love training", ["ai"])).toBe("ai");
+  });
+
+  describe("mode: wholeWord", () => {
+    it("matches whole words", () => {
+      expect(matchesFeedKeyword("I work in AI", ["ai"], "wholeWord")).toBe("ai");
+      expect(matchesFeedKeyword("It's an AI thing.", ["ai"], "wholeWord")).toBe("ai");
+    });
+
+    it("does NOT match inside another word", () => {
+      expect(matchesFeedKeyword("She loves training", ["ai"], "wholeWord")).toBeNull();
+      expect(matchesFeedKeyword("It rained yesterday", ["ai"], "wholeWord")).toBeNull();
+      expect(matchesFeedKeyword("That was a fail", ["ai"], "wholeWord")).toBeNull();
+    });
+
+    it("falls back to substring for keywords with no word-char ends", () => {
+      // "++" has no word chars on either side — `\b` wouldn't apply, so we
+      // fall back to substring matching for that keyword.
+      expect(matchesFeedKeyword("score: ++", ["++"], "wholeWord")).toBe("++");
+    });
+
+    it("handles keywords starting with a non-word char (e.g. hashtags)", () => {
+      // "#ai" starts non-word, ends word → only the trailing `\b` is
+      // enforced. Matches "#ai" in normal contexts.
+      expect(matchesFeedKeyword("Loving the #ai stuff", ["#ai"], "wholeWord")).toBe("#ai");
+      // Trailing `\b` blocks "#aieee" from matching keyword "#ai".
+      expect(matchesFeedKeyword("Loving #aieee posts", ["#ai"], "wholeWord")).toBeNull();
+    });
+
+    it("handles multi-word keywords", () => {
+      expect(
+        matchesFeedKeyword("we use machine learning models", ["machine learning"], "wholeWord")
+      ).toBe("machine learning");
+      expect(
+        matchesFeedKeyword("ML and machine-learning differ", ["machine learning"], "wholeWord")
+      ).toBeNull();
+    });
+
+    it("is case-insensitive", () => {
+      expect(matchesFeedKeyword("AI is the future", ["ai"], "wholeWord")).toBe("ai");
+    });
+  });
+
+  describe("mode: regex", () => {
+    it("compiles each keyword as a case-insensitive regex", () => {
+      expect(matchesFeedKeyword("hello world", ["w.rld"], "regex")).toBe("w.rld");
+      expect(matchesFeedKeyword("count: 42", ["\\d+"], "regex")).toBe("\\d+");
+    });
+
+    it("anchors and alternations work", () => {
+      expect(matchesFeedKeyword("only this", ["^only"], "regex")).toBe("^only");
+      expect(matchesFeedKeyword("hiring now", ["(hiring|firing)"], "regex")).toBe(
+        "(hiring|firing)"
+      );
+    });
+
+    it("silently skips invalid patterns instead of throwing", () => {
+      // Unterminated group is invalid; should not throw — falls through to
+      // null since no other keyword matches.
+      expect(matchesFeedKeyword("anything", ["(unterminated"], "regex")).toBeNull();
+    });
+  });
 });

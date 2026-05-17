@@ -2,7 +2,7 @@
 // Backward-compatible: old exports without `schemaVersion` are treated as v0
 // and silently migrated to the current version.
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 // chrome.storage.local quota (10 MB per extension). The numbers below come
 // from the Chrome MV3 docs and are used both for the in-popup usage indicator
@@ -33,6 +33,7 @@ const SCHEMA_TYPES = {
   hidePolls: "boolean",
   hideCelebrations: "boolean",
   feedKeywordFilterEnabled: "boolean",
+  feedKeywordMatchMode: "string",
   hasSeenOnboarding: "boolean",
   postAgeLimit: "number",
   feedKeywords: "string[]",
@@ -132,6 +133,18 @@ export function migrate(data) {
   // v1 is just "the first version that records its version number."
   if (v < 1) {
     data.schemaVersion = 1;
+  }
+
+  // v1 → v2: introduce `feedKeywordMatchMode`. Existing users were on
+  // case-insensitive substring matching, so we preserve that behavior by
+  // pinning their setting to "substring". New installs (which never go
+  // through this migration) get "wholeWord" via SIFT_DEFAULTS — the better
+  // default that avoids false positives like "ai" matching "training".
+  if (v < 2) {
+    if (typeof data.feedKeywordMatchMode !== "string") {
+      data.feedKeywordMatchMode = "substring";
+    }
+    data.schemaVersion = 2;
   }
 
   return data;

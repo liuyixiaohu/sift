@@ -246,6 +246,15 @@ body {
   display: inline-block;
 }
 
+/* Warning chip: toggle ON, zero matches, page is relevant. The likely
+ * cause is a LinkedIn DOM change that broke our selectors. Amber tint +
+ * ⚠ glyph; full explanation lives in the `title` attribute on hover. */
+.diag-chip[data-severity="warn"] {
+  color: #B97777;
+  font-weight: 600;
+  cursor: help;
+}
+
 .diag-sep {
   color: #B4ADA1;
 }

@@ -62,6 +62,46 @@
     }
   };
 
+  // src/shared/diag.js
+  function relevantCountsFor(diag, settings) {
+    const items = [];
+    const paused = !!diag.paused;
+    function push(label, n, isToggleOn, isAppropriatePage) {
+      if (!isToggleOn || !isAppropriatePage) return;
+      if (n > 0) {
+        items.push({ label, n, severity: "ok" });
+      } else if (!paused) {
+        items.push({ label, n: 0, severity: "warn" });
+      }
+    }
+    if (diag.pageType === "feed") {
+      push("Ads", diag.feed.promoted, !!settings.hidePromoted, true);
+      push("Suggested", diag.feed.suggested, !!settings.hideSuggested, true);
+      push("Recommended", diag.feed.recommended, !!settings.hideRecommended, true);
+      push("Strangers", diag.feed.nonConnection, !!settings.hideNonConnections, true);
+      push("Polls", diag.feed.poll, !!settings.hidePolls, true);
+      push("Celebrations", diag.feed.celebration, !!settings.hideCelebrations, true);
+      push("Keywords", diag.feed.keywordFiltered, !!settings.feedKeywordFilterEnabled, true);
+      push("Too old", diag.feed.tooOld, (settings.postAgeLimit || 0) > 0, true);
+      push("Sidebar widgets", diag.profile.noise, !!settings.hideProfileSuggestions, true);
+    } else if (diag.pageType === "profile") {
+      push("Analytics", diag.profile.analytics, !!settings.hideProfileAnalytics, true);
+      push(
+        "Suggestion widgets",
+        diag.profile.noise,
+        !!settings.hideProfileSuggestions,
+        true
+      );
+    } else if (diag.pageType === "jobs") {
+      if (diag.jobs.flagged > 0) {
+        items.push({ label: "Flagged jobs", n: diag.jobs.flagged, severity: "ok" });
+      }
+    } else if (diag.pageType === "network") {
+      push("Hidden widgets", diag.profile.noise, !!settings.hideProfileSuggestions, true);
+    }
+    return items;
+  }
+
   // src/shared/lists.js
   function containsCi(list, item) {
     if (!list || typeof item !== "string") return false;
@@ -376,32 +416,7 @@
       network: "Network",
       other: "Other"
     };
-    function relevantCountsFor(diag) {
-      const items = [];
-      const push = (label, n) => {
-        if (n > 0) items.push({ label, n });
-      };
-      if (diag.pageType === "feed") {
-        push("Ads", diag.feed.promoted);
-        push("Suggested", diag.feed.suggested);
-        push("Recommended", diag.feed.recommended);
-        push("Strangers", diag.feed.nonConnection);
-        push("Polls", diag.feed.poll);
-        push("Celebrations", diag.feed.celebration);
-        push("Keywords", diag.feed.keywordFiltered);
-        push("Too old", diag.feed.tooOld);
-        push("Sidebar widgets", diag.profile.noise);
-      } else if (diag.pageType === "profile") {
-        push("Analytics", diag.profile.analytics);
-        push("Suggestion widgets", diag.profile.noise);
-      } else if (diag.pageType === "jobs") {
-        push("Flagged jobs", diag.jobs.flagged);
-      } else if (diag.pageType === "network") {
-        push("Hidden widgets", diag.profile.noise);
-      }
-      return items;
-    }
-    function buildDiagnosticPanel(container) {
+    function buildDiagnosticPanel(container, settings) {
       const wrap = document.createElement("div");
       wrap.className = "diag-panel";
       wrap.dataset.state = "loading";
@@ -437,11 +452,11 @@
         pill.className = "diag-page";
         pill.textContent = DIAG_PAGE_LABELS[diag.pageType] || diag.pageType;
         body.appendChild(pill);
-        const items = relevantCountsFor(diag);
+        const items = relevantCountsFor(diag, settings);
         if (items.length === 0) {
           const none = document.createElement("span");
           none.className = "diag-message";
-          none.textContent = " \xB7 nothing detected yet";
+          none.textContent = diag.paused ? " \xB7 paused" : " \xB7 nothing detected yet";
           body.appendChild(none);
           return;
         }
@@ -452,7 +467,13 @@
         items.forEach(function(item, i) {
           const chip = document.createElement("span");
           chip.className = "diag-chip";
-          chip.textContent = item.n + " " + item.label;
+          chip.dataset.severity = item.severity;
+          if (item.severity === "warn") {
+            chip.textContent = "\u26A0 0 " + item.label;
+            chip.title = item.label + " filter is ON but Sift saw 0 matches on this page \u2014 LinkedIn DOM may have changed.";
+          } else {
+            chip.textContent = item.n + " " + item.label;
+          }
           body.appendChild(chip);
           if (i < items.length - 1) {
             const comma = document.createElement("span");
@@ -516,7 +537,7 @@
       let container = document.getElementById("tab-controls");
       container.innerHTML = "";
       buildPauseRow(container, !!settings.siftPaused);
-      buildDiagnosticPanel(container);
+      buildDiagnosticPanel(container, settings);
       let feedGroup = document.createElement("div");
       feedGroup.className = "section-group";
       let feedTitle = document.createElement("div");

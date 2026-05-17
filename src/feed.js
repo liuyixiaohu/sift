@@ -438,6 +438,16 @@ if (chrome.runtime?.id) {
     "Today’s puzzles", // curly apostrophe — LinkedIn uses it consistently
   ]);
 
+  // Analytics widget heading — the heading-text fallback for Hide Analytics.
+  // The original CSS rule keys on `a[href*="/dashboard"]`, but LinkedIn is
+  // mid-rollout to `/analytics` URLs. When the rollout completes, the
+  // URL-based rule silently degrades to a no-op. The heading "Analytics" is
+  // LinkedIn's own widget title — translated per locale but stable in English
+  // (project is English-only, see memory `feedback_sift_english_only`).
+  // Both rules can match the same widget without conflict (`display: none`
+  // is idempotent).
+  const PROFILE_ANALYTICS_HEADINGS = new Set(["Analytics"]);
+
   // Find the widget wrapper around a heading element: the closest <section>
   // if there is one, else the highest ancestor that's still a "card-level"
   // wrapper (parent is an aside, main, or the document body). This catches
@@ -474,10 +484,17 @@ if (chrome.runtime?.id) {
       scope.querySelectorAll("h1, h2, h3, h4, p").forEach((el) => {
         if (el.children.length > 0) return; // leaf nodes only — skip wrappers
         const text = (el.textContent || "").trim();
-        if (!PROFILE_NOISE_HEADINGS.has(text)) return;
-        const wrapper = findNoiseWrapper(el);
-        if (wrapper && !wrapper.dataset.ljProfileNoise) {
-          wrapper.dataset.ljProfileNoise = "true";
+        if (PROFILE_NOISE_HEADINGS.has(text)) {
+          const wrapper = findNoiseWrapper(el);
+          if (wrapper && !wrapper.dataset.ljProfileNoise) {
+            wrapper.dataset.ljProfileNoise = "true";
+          }
+        }
+        if (PROFILE_ANALYTICS_HEADINGS.has(text)) {
+          const wrapper = findNoiseWrapper(el);
+          if (wrapper && !wrapper.dataset.ljProfileAnalytics) {
+            wrapper.dataset.ljProfileAnalytics = "true";
+          }
         }
       });
     }
@@ -575,6 +592,52 @@ if (chrome.runtime?.id) {
       settings.hideProfileSuggestions
     );
   }
+
+  // === Diagnostics responder ===
+  // The popup asks "what does Sift see on this page right now?" so users can
+  // tell at a glance whether selectors are still matching after a LinkedIn DOM
+  // change. Counts are read from the live DOM, not from cumulative stats.
+  function detectPageType() {
+    if (isFeedPage()) return "feed";
+    if (isProfilePage()) return "profile";
+    if (isNetworkPage()) return "network";
+    if (location.pathname.startsWith("/jobs")) return "jobs";
+    return "other";
+  }
+
+  function collectDiagnostics() {
+    // feedDoc scopes feed counters to the iframe when LinkedIn renders the
+    // feed there; everything else lives in the top-frame document.
+    const feedQ = (sel) => feedDoc.querySelectorAll(sel).length;
+    const topQ = (sel) => document.querySelectorAll(sel).length;
+    return {
+      url: location.href,
+      pageType: detectPageType(),
+      feed: {
+        promoted: feedQ('[data-lj-promoted="true"]'),
+        suggested: feedQ('[data-lj-suggested="true"]'),
+        recommended: feedQ('[data-lj-recommended="true"]'),
+        nonConnection: feedQ('[data-lj-non-connection="true"]'),
+        poll: feedQ('[data-lj-poll="true"]'),
+        celebration: feedQ('[data-lj-celebration="true"]'),
+        keywordFiltered: feedQ('[data-lj-keyword-filtered="true"]'),
+        tooOld: feedQ('[data-lj-too-old="true"]'),
+      },
+      profile: {
+        noise: topQ('[data-lj-profile-noise="true"]'),
+        analytics: topQ('[data-lj-profile-analytics="true"]'),
+      },
+      jobs: {
+        flagged: topQ("[data-lj-reasons]"),
+      },
+    };
+  }
+
+  chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+    if (msg?.type !== "SIFT_DIAG") return false;
+    sendResponse(collectDiagnostics());
+    return false; // response sent synchronously
+  });
 
   // Only re-scan when actual settings change, not stats writes
   chrome.storage.onChanged.addListener((changes, area) => {

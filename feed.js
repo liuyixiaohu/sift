@@ -397,10 +397,17 @@
         scope.querySelectorAll("h1, h2, h3, h4, p").forEach((el) => {
           if (el.children.length > 0) return;
           const text = (el.textContent || "").trim();
-          if (!PROFILE_NOISE_HEADINGS.has(text)) return;
-          const wrapper = findNoiseWrapper(el);
-          if (wrapper && !wrapper.dataset.ljProfileNoise) {
-            wrapper.dataset.ljProfileNoise = "true";
+          if (PROFILE_NOISE_HEADINGS.has(text)) {
+            const wrapper = findNoiseWrapper(el);
+            if (wrapper && !wrapper.dataset.ljProfileNoise) {
+              wrapper.dataset.ljProfileNoise = "true";
+            }
+          }
+          if (PROFILE_ANALYTICS_HEADINGS.has(text)) {
+            const wrapper = findNoiseWrapper(el);
+            if (wrapper && !wrapper.dataset.ljProfileAnalytics) {
+              wrapper.dataset.ljProfileAnalytics = "true";
+            }
           }
         });
       }
@@ -469,6 +476,36 @@
         "lj-hide-profile-suggestions",
         settings.hideProfileSuggestions
       );
+    }, detectPageType = function() {
+      if (isFeedPage()) return "feed";
+      if (isProfilePage()) return "profile";
+      if (isNetworkPage()) return "network";
+      if (location.pathname.startsWith("/jobs")) return "jobs";
+      return "other";
+    }, collectDiagnostics = function() {
+      const feedQ = (sel) => feedDoc.querySelectorAll(sel).length;
+      const topQ = (sel) => document.querySelectorAll(sel).length;
+      return {
+        url: location.href,
+        pageType: detectPageType(),
+        feed: {
+          promoted: feedQ('[data-lj-promoted="true"]'),
+          suggested: feedQ('[data-lj-suggested="true"]'),
+          recommended: feedQ('[data-lj-recommended="true"]'),
+          nonConnection: feedQ('[data-lj-non-connection="true"]'),
+          poll: feedQ('[data-lj-poll="true"]'),
+          celebration: feedQ('[data-lj-celebration="true"]'),
+          keywordFiltered: feedQ('[data-lj-keyword-filtered="true"]'),
+          tooOld: feedQ('[data-lj-too-old="true"]')
+        },
+        profile: {
+          noise: topQ('[data-lj-profile-noise="true"]'),
+          analytics: topQ('[data-lj-profile-analytics="true"]')
+        },
+        jobs: {
+          flagged: topQ("[data-lj-reasons]")
+        }
+      };
     }, injectFeedCssIntoIframe = function() {
       if (feedDoc === document) return;
       if (feedDoc.getElementById("lj-feed-css")) return;
@@ -618,7 +655,13 @@
       "Today\u2019s puzzles"
       // curly apostrophe — LinkedIn uses it consistently
     ]);
+    const PROFILE_ANALYTICS_HEADINGS = /* @__PURE__ */ new Set(["Analytics"]);
     let networkInitialized = false;
+    chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+      if (msg?.type !== "SIFT_DIAG") return false;
+      sendResponse(collectDiagnostics());
+      return false;
+    });
     chrome.storage.onChanged.addListener((changes, area) => {
       if (area !== "local") return;
       if (!Object.keys(changes).some((k) => SETTING_KEYS.has(k))) return;

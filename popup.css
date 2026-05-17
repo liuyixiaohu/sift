@@ -146,6 +146,78 @@ body {
   border-bottom: 1px solid #E4DDD2;
 }
 
+/* === Diagnostic panel ===
+ * Live "what does Sift see on this page" strip at the top of the Controls
+ * tab. One line, compact. Surfaces selector breakage early — if the user has
+ * Hide Ads ON but the panel reads "Feed · nothing detected yet" on a feed
+ * page, something has likely broken upstream.
+ */
+.diag-panel {
+  background: rgba(228, 221, 210, 0.32);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-bottom: 14px;
+}
+
+.diag-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.diag-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A939B;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.diag-refresh {
+  background: none;
+  border: none;
+  color: #8A939B;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 4px;
+  transition: color 0.15s;
+}
+
+.diag-refresh:hover {
+  color: #D9797B;
+}
+
+.diag-body {
+  font-size: 12px;
+  color: #5A636B;
+  line-height: 1.4;
+}
+
+.diag-page {
+  font-weight: 600;
+  color: #1F2328;
+}
+
+.diag-chip {
+  display: inline-block;
+}
+
+.diag-sep {
+  color: #B4ADA1;
+}
+
+.diag-message {
+  color: #8A939B;
+  font-style: italic;
+}
+
+/* Subtle pulse while waiting for the content script to reply */
+.diag-panel[data-state="loading"] .diag-message {
+  opacity: 0.6;
+}
+
 /* === Toggle Rows === */
 
 .toggle-row {

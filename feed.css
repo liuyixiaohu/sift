@@ -19,6 +19,18 @@ body.lj-hide-profile-analytics
   display: none !important;
 }
 
+/* Heading-text fallback for Hide Analytics.
+ * feed.js tags the Analytics widget wrapper with `data-lj-profile-analytics`
+ * by matching the "Analytics" heading text (see PROFILE_ANALYTICS_HEADINGS).
+ * Future-proofs against LinkedIn's `/dashboard` → `/analytics` URL rollout:
+ * when LinkedIn finishes renaming, the URL-based rule above silently degrades
+ * to a no-op, but this rule keeps the toggle working. Both rules can match
+ * the same widget — display:none is idempotent.
+ */
+body.lj-hide-profile-analytics [data-lj-profile-analytics="true"] {
+  display: none !important;
+}
+
 /* Profile page: hide suggestion widgets and ad banners.
  * Sections are tagged with data-lj-profile-noise="true" by feed.js when their
  * heading matches PROFILE_NOISE_HEADINGS ("Suggested for you", "Who your

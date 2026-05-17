@@ -49,6 +49,13 @@ export function isSkippedTitle(card) {
 
 // ==================== Label / badge rendering ====================
 export function labelCard(card, reason) {
+  // Pause short-circuit: no badges, no border, no incrementStat. The
+  // popup advertises "All filtering suspended" so any Sift-painted
+  // decoration on cards would contradict that. On unpause, the storage
+  // onChanged handler resets state.processedCards so cards re-evaluate
+  // and badges come back.
+  if (state.siftPaused) return false;
+
   const existing = card.dataset.ljReasons ? card.dataset.ljReasons.split(",") : [];
   if (existing.includes(reason)) return false;
 

@@ -69,10 +69,23 @@ export function showToast(message, options = {}) {
     });
     undoBtn.addEventListener("click", (e) => {
       e.stopPropagation();
+      // Catch (don't just try/finally) so a thrown undo callback gets
+      // surfaced to the user rather than silently dismissing the toast.
+      // The most realistic failure: the undo mutates an array in memory
+      // then saves to storage, and the storage write rejects — leaving
+      // memory and disk out of sync. Tell the user instead of pretending
+      // the undo worked.
       try {
         options.undo();
-      } finally {
         dismiss();
+      } catch (err) {
+        console.error("[Sift] Toast undo callback threw:", err);
+        dismiss();
+        // Re-toast with a more honest message. setTimeout breaks the
+        // sync chain so the dismissed toast finishes fading first.
+        setTimeout(() => {
+          showToast("Undo failed — your skip list may be out of sync");
+        }, 0);
       }
     });
     toast.appendChild(undoBtn);

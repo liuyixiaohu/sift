@@ -923,6 +923,14 @@
       resetBtn.addEventListener("click", function() {
         if (!confirm("Reset all stats to zero?")) return;
         chrome.storage.local.set(STATS_DEFAULTS, function() {
+          if (chrome.runtime.lastError) {
+            console.error(
+              "[Sift] stats reset failed:",
+              chrome.runtime.lastError.message
+            );
+            showToast("Reset failed: " + chrome.runtime.lastError.message);
+            return;
+          }
           buildStatsTab(STATS_DEFAULTS.stats, STATS_DEFAULTS.statsAllTime);
           showToast("Stats reset");
         });
@@ -1045,7 +1053,6 @@
         }
         const migrated = migrate(validation.data);
         const importedBytes = estimateBytes(migrated);
-        const currentBytes = await getStorageUsage();
         const importKeys = new Set(Object.keys(migrated));
         const allCurrent = await new Promise(
           (r) => chrome.storage.local.get(null, r)
@@ -1063,13 +1070,20 @@
           return;
         }
         chrome.storage.local.set(migrated, function() {
+          if (chrome.runtime.lastError) {
+            console.error(
+              "[Sift] Import write failed:",
+              chrome.runtime.lastError.message
+            );
+            showToast("Import failed: " + chrome.runtime.lastError.message);
+            return;
+          }
           const warn = projected > STORAGE_QUOTA_BYTES * STORAGE_WARN_FRACTION;
           showToast(
             warn ? "Imported, but storage now " + formatBytes(projected) + " \u2014 close to quota." : "Backup imported successfully"
           );
           refreshStorageUsage(usageEl);
           loadAndBuild();
-          void currentBytes;
         });
       });
       let importDesc = document.createElement("div");
@@ -1083,6 +1097,14 @@
           "Are you sure you want to reset all Sift settings and stats? This cannot be undone."
         )) {
           chrome.storage.local.clear(function() {
+            if (chrome.runtime.lastError) {
+              console.error(
+                "[Sift] storage.clear failed:",
+                chrome.runtime.lastError.message
+              );
+              showToast("Reset failed: " + chrome.runtime.lastError.message);
+              return;
+            }
             showToast("All data cleared");
             refreshStorageUsage(usageEl);
             loadAndBuild();

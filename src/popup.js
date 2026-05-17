@@ -857,6 +857,14 @@ import {
     resetBtn.addEventListener("click", function () {
       if (!confirm("Reset all stats to zero?")) return;
       chrome.storage.local.set(STATS_DEFAULTS, function () {
+        if (chrome.runtime.lastError) {
+          console.error(
+            "[Sift] stats reset failed:",
+            chrome.runtime.lastError.message
+          );
+          showToast("Reset failed: " + chrome.runtime.lastError.message);
+          return;
+        }
         buildStatsTab(STATS_DEFAULTS.stats, STATS_DEFAULTS.statsAllTime);
         showToast("Stats reset");
       });
@@ -1021,7 +1029,6 @@ import {
       // rather than appending, so the relevant comparison is the import
       // size + bytes from any keys we won't be touching.
       const importedBytes = estimateBytes(migrated);
-      const currentBytes = await getStorageUsage();
       const importKeys = new Set(Object.keys(migrated));
       const allCurrent = await new Promise((r) =>
         chrome.storage.local.get(null, r)
@@ -1044,6 +1051,18 @@ import {
       }
 
       chrome.storage.local.set(migrated, function () {
+        if (chrome.runtime.lastError) {
+          // Without this check, the toast below cheerfully reports
+          // "Backup imported successfully" while storage still has the
+          // old data. The user reloads and finds nothing changed, files
+          // a "import is broken" bug.
+          console.error(
+            "[Sift] Import write failed:",
+            chrome.runtime.lastError.message
+          );
+          showToast("Import failed: " + chrome.runtime.lastError.message);
+          return;
+        }
         const warn = projected > STORAGE_QUOTA_BYTES * STORAGE_WARN_FRACTION;
         showToast(
           warn
@@ -1053,7 +1072,6 @@ import {
         refreshStorageUsage(usageEl);
         // Reload the controls tab to reflect new settings.
         loadAndBuild();
-        void currentBytes; // currentBytes captured for telemetry — kept to make intent clear.
       });
     });
 
@@ -1073,6 +1091,14 @@ import {
         )
       ) {
         chrome.storage.local.clear(function () {
+          if (chrome.runtime.lastError) {
+            console.error(
+              "[Sift] storage.clear failed:",
+              chrome.runtime.lastError.message
+            );
+            showToast("Reset failed: " + chrome.runtime.lastError.message);
+            return;
+          }
           showToast("All data cleared");
           refreshStorageUsage(usageEl);
           loadAndBuild();

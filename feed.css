@@ -203,15 +203,3 @@ body.lj-hide-old-posts [data-lj-too-old="true"] {
   transform: translateY(0);
 }
 
-/* === Auto-hide right sidebar on narrow viewports (recoverable space) === */
-/* Selectors below targeted older LinkedIn DOM; current renames may have
- * neutralized them. Kept as a no-op until verified one way or the other. */
-@media (max-width: 1100px) {
-  aside[aria-label="LinkedIn News"],
-  [role="complementary"][aria-label="LinkedIn News"],
-  main > div > div > div:last-child:nth-child(3),
-  footer[aria-label="LinkedIn Footer Content"],
-  [role="contentinfo"][aria-label="LinkedIn Footer Content"] {
-    display: none !important;
-  }
-}

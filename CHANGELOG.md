@@ -1,5 +1,16 @@
 # Changelog
 
+## v3.1
+
+A hotfix on top of v3. One user-visible bug fix, plus the regression-prevention scaffolding so the same class of bug fails CI next time.
+
+### Fixed
+- **Profile recommendations details page no longer renders blank.** `feed.css` carried an `@media (max-width: 1100px)` block whose structural selector `main > div > div > div:last-child:nth-child(3)` had no `body.lj-*` guard. Because the stylesheet is injected on every linkedin.com page (the manifest match is broad), at narrow viewports the rule fired regardless of any toggle and hit the recommendations list container on `/in/{user}/details/recommendations/`. The original author had flagged the block as "kept as a no-op until verified" — this release finishes that verification by deleting it. LinkedIn DOM cohorts that didn't match the selector were unaffected; cohorts that did saw a blank details page.
+
+### Internal
+- **CSS namespace guard test.** `tests/css-namespace.test.js` statically asserts every selector in `feed.css` contains the `lj-` substring, so a future unguarded structural selector fails CI before it leaks onto LinkedIn pages Sift was never meant to touch. Includes a meta-assertion that the extractor itself would still flag the recommendations bug if reintroduced — guards the guard.
+- **Manual page coverage matrix.** `docs/MANUAL-TEST-MATRIX.md` enumerates 25 LinkedIn routes across three tiers with a 1024px narrow-viewport pass for the layout-regression class. Run the Tier 1 routes at default and narrow widths before each release.
+
 ## v3
 
 Stats tab redesign and a developer-hygiene fix to keep popup bundles from going stale.

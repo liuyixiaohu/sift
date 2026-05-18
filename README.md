@@ -2,56 +2,53 @@
 
 Take back a LinkedIn worth your time.
 
-A Chrome extension that cleans up the LinkedIn feed and improves the job search. Filter posts by keywords, hide ads and spam, flag bad job listings, mute or unfollow inline, and pause everything with one switch.
+Clean up your LinkedIn feed and supercharge your job search, all in one extension.
 
 ## Features
 
-### Feed (`/feed/`)
-- **Pause Sift**: master switch to temporarily see LinkedIn's raw feed without losing your config.
-- **Hide Ads** (Promoted posts).
-- **Hide Suggested** posts.
-- **Hide Recommended** posts and LinkedIn Learning promotions.
-- **Hide Strangers** (non-connection posts).
-- **Keyword Filter** with three match modes:
-  - **Whole word** (default for new installs). `ai` matches `AI engineers` but not `training`. Hashtags (`#ai`) and symbols (`c++`) work via lookbehind/lookahead.
-  - **Substring** (legacy default). Existing users are migrated here so behavior doesn't change.
-  - **Regex**. Each keyword is a case-insensitive regex. Invalid patterns are rejected at add-time.
-- **Hide Polls**.
-- **Hide Celebrations** (job updates, work anniversaries, birthdays, promotions).
-- **Hide Old Posts** (older than 1 day, 3 days, 1 week, 2 weeks, or 1 month).
-- **Hide Upsells** ("Try Campaign Manager" and similar promotions).
-- **Unfollow** inline next to "· 1st" on posts and on interaction headers ("XXX likes this").
-- **Mute Keyword** via right-click. Select any text on LinkedIn, then "Mute keyword" to add it to your filter.
+### Feed Cleanup
 
-### Job Search (`/jobs/search-results/`)
-- **Reposted** detection (card text and detail panel scan).
-- **Applied** detection (leaf node matching, excludes "Applied Materials" etc.).
-- **No Sponsor** detection (25+ keyword patterns in job descriptions).
-- **Unpaid** detection (volunteer / unpaid keyword scan).
-- **Good Match** badge. Green pill on jobs LinkedIn Premium rates as a strong fit.
-- **Skip Company** list. Whole-word match, case-insensitive, with comma-separated bulk paste.
-- **Skip Title Keyword** list. Whole-word match. `intern` matches "Software Intern" but not "Internship".
-- **Auto-skip Flagged Companies**. Automatically adds detected No Sponsor and Unpaid companies to your skip list.
-- **Skip Current Company** with **undo**. Clicked the wrong one? Five-second undo button on the toast.
-- **Auto-Scan**. Click-through scan with detail panel fingerprint detection.
-- **Dim or Hide** filtered cards.
-- Badge persistence across LinkedIn DOM re-renders.
+- Pause everything with one switch when you want to see LinkedIn's raw feed
+- Hide ads, suggested posts, and recommended content automatically
+- Hide polls, celebration posts, and Premium upsells
+- Define custom keywords with three match modes (whole word, substring, or regex)
+- Right-click any text and select "Mute keyword" to add it to your filter
+- Set a post age limit: hide posts older than 1 day, 3 days, 1 week, 2 weeks, or 1 month
+- One-click Unfollow on posts and interaction headers ("XXX likes this")
 
-### Profile (`/in/*`)
-- **Hide Suggestions and Ads**. Removes "Suggested for you", "People you may know", "You might like", and ad iframes. The same toggle also covers the feed page's LinkedIn News, Today's puzzles, and right-rail ads.
-- **Hide Analytics**. Hides the Analytics widget (profile views, impressions, search appearances). Uses both a URL-based selector and a heading-text fallback so it survives LinkedIn's `/dashboard` to `/analytics` URL rollout.
+### Job Search Intelligence
 
-### My Network (`/mynetwork/*`)
-- **Hide Ads**. Removes Promoted ads from the sidebar.
-- **Hide Game Promo**. Removes "Need a 30 second break?" game promotions.
+- Auto-detect and flag Reposted, Applied, No Sponsor, and Unpaid listings
+- Good Match badge highlights jobs LinkedIn Premium rates as a strong fit
+- Skip Company list: batch-add companies you want to avoid (comma-separated paste supported)
+- Skip Title Keywords: filter jobs by title patterns
+- Auto-skip Flagged Companies: detected No Sponsor and Unpaid companies are automatically added to your skip list
+- Undo button on accidental "Skip Current Company" clicks
+- Auto-Scan all visible cards with one click
+- Dim or completely hide flagged job cards
 
-### Popup
-- **Pause master toggle** at the top. Single switch to suspend all filtering across feed, profile, network, and jobs.
-- **Diagnostics**. A live "On this page" strip shows what Sift is filtering on the active LinkedIn tab. Click ↻ to refresh.
-- **Smart warnings**. If a filter is on but Sift matched zero elements on the relevant page, the diagnostic chip flips to amber so you can spot a LinkedIn DOM change early. A distinct olive chip flags "your own regex is broken" so the panel never falsely accuses LinkedIn.
-- **Controls**. Toggles grouped by page (Feed, Profile, Jobs) with sub-groups. Keyword list editing with a match-mode dropdown. Skip-list editing with inline add inputs (comma-separated bulk paste) and search.
-- **Stats**. Daily and all-time counters for every filter action.
-- **Data**. Export and import settings as JSON (validated, schema-migrated, quota-checked), monitor storage usage, reset to defaults.
+### Page Cleanup
+
+- Profile page: hide Analytics widget, suggestion widgets, and ads
+- Feed sidebar: hide LinkedIn News, Today's puzzles, and right-rail ads
+- My Network page: hide promoted content and suggested games
+
+### Diagnostics
+
+- Live "On this page" strip in the popup shows what Sift is filtering right now
+- Smart warnings flag when LinkedIn changes something and a filter stops matching, so you're never silently flying blind
+
+### Privacy First
+
+- Runs 100% in your browser. No data collected, no external servers
+- All settings stored locally via Chrome storage
+- Open source (MIT): https://github.com/liuyixiaohu/sift
+
+### Control Center
+
+- Controls tab: all toggles and filter lists in one place
+- Stats tab: daily and all-time counters for every filter action
+- Data tab: export and import settings as JSON (with validation), monitor storage usage, reset to defaults
 
 ## Install
 

@@ -47,8 +47,17 @@ body.lj-hide-promoted footer.artdeco-card__actions:has(a[href*="/campaignmanager
   display: none !important;
 }
 
-/* Network page: hide game promo (reuses hidePromoted toggle) */
-body.lj-hide-network-game section:has(a[href*="/games/"]) {
+/* Network page: hide game promo (reuses hidePromoted toggle).
+ *
+ * `:not(:has(section a[href*="/games/"]))` constrains the match to the
+ * INNERMOST section. Without it, `:has()` transitivity would also match
+ * any outer wrapper section that contains the games link as a descendant —
+ * e.g. on `/mynetwork/grow/` LinkedIn nests the Patches promo inside the
+ * "No pending invitations" panel section, so the unconstrained selector
+ * hid the entire main panel. Same pattern as the analytics rule above.
+ */
+body.lj-hide-network-game
+  section:has(a[href*="/games/"]):not(:has(section a[href*="/games/"])) {
   display: none !important;
 }
 

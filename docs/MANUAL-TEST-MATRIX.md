@@ -41,9 +41,9 @@ These are the routes most users hit daily, and the ones where Sift actively modi
 | `/in/kun-l/details/certifications/` | none | | | ✗ expect | | | |
 | `/in/kun-l/details/projects/` | none | | | ✗ expect | | | |
 | `/in/kun-l/details/featured/` | none | | | ✗ expect | | | |
-| `/in/kun-l/details/activity/` | none | | | ✗ expect | | | |
+| `/in/kun-l/recent-activity/all/` | none | | | ✗ expect | | | Activity lives outside `/details/`
 | `/mynetwork/` | network | | | ✗ expect | | | |
-| `/jobs/search/?keywords=engineer` | jobs | | | ✗ expect | | | |
+| `/jobs/search-results/?keywords=engineer` | jobs | | | ✗ expect | | | `/jobs/search/` doesn't trigger `isSearchPage()`
 
 ---
 

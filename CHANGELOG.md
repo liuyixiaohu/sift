@@ -1,5 +1,32 @@
 # Changelog
 
+## v3.1
+
+A hotfix on top of v3. Two user-visible CSS bugs of the same class — `:has()` selectors that didn't constrain to the innermost match and accidentally took out their entire wrapper section — plus the regression-prevention scaffolding so the next one fails CI.
+
+### Fixed
+- **My Network "Grow" page no longer renders blank.** `feed.css` had `body.lj-hide-network-game section:has(a[href*="/games/"])` with no innermost-only guard. `:has()` is transitive — `section:has(.X)` matches every ancestor section, not just the leaf. On `/mynetwork/grow/` LinkedIn nests the Patches puzzle promo inside the "No pending invitations" panel section, so the unconstrained selector hid the entire main panel along with the promo. Fixed with `:not(:has(section a[href*="/games/"]))` to restrict the match to the innermost section — same pattern the Analytics rule already used.
+- **Removed unguarded `@media (max-width: 1100px)` block from `feed.css`.** Carried a structural selector `main > div > div > div:last-child:nth-child(3)` with no `body.lj-*` guard. Because the stylesheet is injected on every linkedin.com page (the manifest match is broad), at narrow viewports the rule fired regardless of any toggle. The original author had flagged the block as "kept as a no-op until verified" — this release finishes that verification by deleting it.
+
+### Internal
+- **CSS namespace guard test.** `tests/css-namespace.test.js` statically asserts every selector in `feed.css` contains the `lj-` substring, so a future unguarded structural selector fails CI before it leaks onto LinkedIn pages Sift was never meant to touch. Includes a meta-assertion that the extractor itself would still flag the recommendations bug if reintroduced — guards the guard.
+- **Manual page coverage matrix.** `docs/MANUAL-TEST-MATRIX.md` enumerates 25 LinkedIn routes across three tiers with a 1024px narrow-viewport pass for the layout-regression class. Run the Tier 1 routes at default and narrow widths before each release.
+
+## v3
+
+Stats tab redesign and a developer-hygiene fix to keep popup bundles from going stale.
+
+### Changed
+- **Stats tab is one grid, not two sections.** The previous layout repeated nine metric labels across separate "Today" and "All Time" sub-groups, forcing the eye to scan two columns to compare a single metric's daily and lifetime values. The new layout has one row per metric showing both side by side: `Ads  12 · 8.4k`. Today is bold in the accent color; all-time is muted gray; today=0 fades to beige so a wall of inactive metrics doesn't drown out the ones that actually moved today. Vertical space roughly halves; the today-vs-cumulative comparison is now one eye movement.
+
+### New
+- **Typed reset confirmation.** Both `Reset Stats` and `Reset All Data` no longer use the native `confirm()` dialog. Clicking either button replaces it in place with an inline strip: caption, text input, Cancel, Confirm. Confirm stays disabled until the typed input matches the button label (`reset stats` / `reset all data`); matching is case-insensitive with surrounding whitespace trimmed. `Enter` confirms, `Esc` cancels. The native one-click confirm gate was a single accidental click from clearing all stats; the typed phrase forces a deliberate pause.
+
+### Internal
+- **`formatNumber` spec tightened.** Lowercase `k`, no decimal at 10k+ (`14k` not `14.0K`), clean transition to `M` at 999500 — the old function emitted `1000.0K` in that band. Right-column width is now predictable across all magnitudes (`1.0k–9.9k`, `10k–999k`, `1.0M–9.9M`, `10M+`). Non-numeric / negative / `Infinity` inputs clamp to `"0"`.
+- **Pre-commit hook auto-rebuilds bundles when `src/` is staged** (#57). Husky installs the hook via the `prepare` script on `npm install`. Closes a footgun where commits to `src/` could silently ship stale root bundles — caught only by code review screenshots several iterations into a PR.
+- **In-place stats refresh keys cells by `data-stat-key` + `data-stat-period`** instead of positional `querySelectorAll` indexing. Same fast-path / full-rebuild fallback shape, less fragile to DOM changes.
+
 ## v2.18
 
 A correctness pass driven by an independent code-review round. Five merged PRs (#48 to #52). User-visible changes are small. Under the hood the diagnostic panel is now trustworthy, and Pause actually means "all filtering suspended."

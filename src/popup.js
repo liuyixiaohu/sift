@@ -902,37 +902,27 @@ import {
       chrome.storage.local.set({ stats: stats });
     }
 
-    // Today section
-    let todaySection = document.createElement("div");
-    todaySection.className = "sub-group";
-    let todayTitle = document.createElement("div");
-    todayTitle.className = "sub-group-title";
-    todayTitle.textContent = "Today";
-    todaySection.appendChild(todayTitle);
+    // Header: "TODAY · ALL TIME" (Today in accent color)
+    let head = document.createElement("div");
+    head.className = "stats-head";
+    let headToday = document.createElement("span");
+    headToday.className = "stats-head-today";
+    headToday.textContent = "Today";
+    let headSep = document.createElement("span");
+    headSep.className = "stats-head-sep";
+    headSep.textContent = "·";
+    head.appendChild(headToday);
+    head.appendChild(headSep);
+    head.appendChild(document.createTextNode("All time"));
+    container.appendChild(head);
 
-    let todayList = document.createElement("div");
-    todayList.className = "stats-list";
+    // Combined grid: one row per metric, today · all-time side by side
+    let grid = document.createElement("div");
+    grid.className = "stats-grid";
     Object.keys(STAT_LABELS).forEach(function (key) {
-      todayList.appendChild(createStatRow(stats[key] || 0, STAT_LABELS[key]));
+      appendStatRow(grid, key, STAT_LABELS[key], stats[key] || 0, statsAllTime[key] || 0);
     });
-    todaySection.appendChild(todayList);
-    container.appendChild(todaySection);
-
-    // All Time section
-    let allTimeSection = document.createElement("div");
-    allTimeSection.className = "sub-group";
-    let allTimeTitle = document.createElement("div");
-    allTimeTitle.className = "sub-group-title";
-    allTimeTitle.textContent = "All Time";
-    allTimeSection.appendChild(allTimeTitle);
-
-    let allTimeList = document.createElement("div");
-    allTimeList.className = "stats-list";
-    Object.keys(STAT_LABELS).forEach(function (key) {
-      allTimeList.appendChild(createStatRow(statsAllTime[key] || 0, STAT_LABELS[key]));
-    });
-    allTimeSection.appendChild(allTimeList);
-    container.appendChild(allTimeSection);
+    container.appendChild(grid);
 
     // Reset Stats button
     let resetRow = document.createElement("div");
@@ -969,24 +959,50 @@ import {
     container.appendChild(resetRow);
   }
 
-  function createStatRow(number, label) {
-    let row = document.createElement("div");
-    row.className = "stat-row";
+  // Appends 4 grid cells (label, today, separator, all-time) for one metric.
+  // data-stat-key + data-stat-period on numeric cells lets the refresh loop
+  // update values without rebuilding the DOM.
+  function appendStatRow(grid, key, label, todayVal, allVal) {
     let labelEl = document.createElement("div");
     labelEl.className = "stat-label";
     labelEl.textContent = label;
-    let numEl = document.createElement("div");
-    numEl.className = "stat-number";
-    numEl.textContent = formatNumber(number);
-    row.appendChild(labelEl);
-    row.appendChild(numEl);
-    return row;
+    grid.appendChild(labelEl);
+
+    let todayEl = document.createElement("div");
+    todayEl.className = "stat-today";
+    todayEl.dataset.statKey = key;
+    todayEl.dataset.statPeriod = "today";
+    todayEl.dataset.zero = String(todayVal === 0);
+    todayEl.textContent = formatNumber(todayVal);
+    grid.appendChild(todayEl);
+
+    let sepEl = document.createElement("div");
+    sepEl.className = "stat-sep";
+    sepEl.textContent = "·";
+    grid.appendChild(sepEl);
+
+    let allEl = document.createElement("div");
+    allEl.className = "stat-all";
+    allEl.dataset.statKey = key;
+    allEl.dataset.statPeriod = "all";
+    allEl.textContent = formatNumber(allVal);
+    grid.appendChild(allEl);
   }
 
+  // Renders a stat count for the row layout. Lowercase k, uppercase M.
+  // Single decimal under 10× the unit (1.0k–9.9k, 1.0M–9.9M); no decimal
+  // above (10k–999k, 10M+). Boundaries use 9950 / 999500 / 9950000 so the
+  // *displayed* value never rounds to "10.0k" or "1000k" — every transition
+  // hops to the next-cleaner format. Non-numeric / negative / Infinity → "0".
   function formatNumber(n) {
-    if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
-    if (n >= 1000) return (n / 1000).toFixed(1) + "K";
-    return String(n);
+    if (typeof n !== "number" || !isFinite(n) || n < 0) return "0";
+    if (n < 1000) return String(Math.floor(n));
+    if (n < 999500) {
+      return n < 9950 ? (n / 1000).toFixed(1) + "k" : Math.round(n / 1000) + "k";
+    }
+    return n < 9950000
+      ? (n / 1000000).toFixed(1) + "M"
+      : Math.round(n / 1000000) + "M";
   }
 
   let statsInterval = null;
@@ -996,16 +1012,22 @@ import {
     statsInterval = setInterval(function () {
       chrome.storage.local.get(STATS_DEFAULTS, function (data) {
         // Update stat numbers in-place instead of rebuilding the entire DOM
-        const numbers = document.querySelectorAll("#tab-stats .stat-number");
+        const cells = document.querySelectorAll("#tab-stats [data-stat-key]");
         const keys = Object.keys(STAT_LABELS);
-        if (numbers.length === keys.length * 2) {
+        if (cells.length === keys.length * 2) {
           const today = getTodayString();
           if (data.stats.today !== today) {
             data.stats = Object.assign({}, STATS_DEFAULTS.stats, { today: today });
           }
-          keys.forEach(function (key, i) {
-            numbers[i].textContent = formatNumber(data.stats[key] || 0);
-            numbers[keys.length + i].textContent = formatNumber(data.statsAllTime[key] || 0);
+          cells.forEach(function (cell) {
+            const key = cell.dataset.statKey;
+            const period = cell.dataset.statPeriod;
+            const value =
+              (period === "today" ? data.stats[key] : data.statsAllTime[key]) || 0;
+            cell.textContent = formatNumber(value);
+            if (period === "today") {
+              cell.dataset.zero = String(value === 0);
+            }
           });
         } else {
           // DOM structure mismatch — full rebuild as fallback

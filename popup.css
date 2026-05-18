@@ -489,18 +489,45 @@ body {
   color: #B5AFA6;
 }
 
-/* === Stats Tab === */
+/* === Stats Tab ===
+ * One row per metric showing `today · all-time`. Today is the focus
+ * (accent color, bold); all-time is reference (muted gray). A faded today
+ * value (#C7BFB2) signals "0 today, look at all-time" so a wall of zeros
+ * doesn't dominate the panel.
+ */
 
-.stats-list {
-  display: flex;
-  flex-direction: column;
+.stats-head {
+  text-align: right;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8A939B;
+  padding-bottom: 7px;
+  border-bottom: 1px solid #E4DDD2;
+  margin-bottom: 4px;
 }
 
-.stat-row {
-  display: flex;
-  justify-content: space-between;
+.stats-head-today {
+  color: #D9797B;
+}
+
+.stats-head-sep {
+  color: #B4ADA1;
+  margin: 0 4px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 32px 14px 56px;
   align-items: baseline;
-  padding: 3px 0;
+  row-gap: 2px;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.stats-grid > div {
+  padding: 5px 0;
 }
 
 .stat-label {
@@ -508,11 +535,25 @@ body {
   color: #1F2328;
 }
 
-.stat-number {
-  font-size: 14px;
-  font-weight: 600;
+.stat-today {
+  text-align: right;
   color: #D9797B;
-  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.stat-today[data-zero="true"] {
+  color: #C7BFB2;
+  font-weight: 400;
+}
+
+.stat-sep {
+  text-align: center;
+  color: #B4ADA1;
+}
+
+.stat-all {
+  text-align: right;
+  color: #8A939B;
 }
 
 /* === Data Tab === */

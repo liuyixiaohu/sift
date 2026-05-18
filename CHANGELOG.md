@@ -2,10 +2,11 @@
 
 ## v3.1
 
-A hotfix on top of v3. One user-visible bug fix, plus the regression-prevention scaffolding so the same class of bug fails CI next time.
+A hotfix on top of v3. Two user-visible CSS bugs of the same class — `:has()` selectors that didn't constrain to the innermost match and accidentally took out their entire wrapper section — plus the regression-prevention scaffolding so the next one fails CI.
 
 ### Fixed
-- **Profile recommendations details page no longer renders blank.** `feed.css` carried an `@media (max-width: 1100px)` block whose structural selector `main > div > div > div:last-child:nth-child(3)` had no `body.lj-*` guard. Because the stylesheet is injected on every linkedin.com page (the manifest match is broad), at narrow viewports the rule fired regardless of any toggle and hit the recommendations list container on `/in/{user}/details/recommendations/`. The original author had flagged the block as "kept as a no-op until verified" — this release finishes that verification by deleting it. LinkedIn DOM cohorts that didn't match the selector were unaffected; cohorts that did saw a blank details page.
+- **My Network "Grow" page no longer renders blank.** `feed.css` had `body.lj-hide-network-game section:has(a[href*="/games/"])` with no innermost-only guard. `:has()` is transitive — `section:has(.X)` matches every ancestor section, not just the leaf. On `/mynetwork/grow/` LinkedIn nests the Patches puzzle promo inside the "No pending invitations" panel section, so the unconstrained selector hid the entire main panel along with the promo. Fixed with `:not(:has(section a[href*="/games/"]))` to restrict the match to the innermost section — same pattern the Analytics rule already used.
+- **Removed unguarded `@media (max-width: 1100px)` block from `feed.css`.** Carried a structural selector `main > div > div > div:last-child:nth-child(3)` with no `body.lj-*` guard. Because the stylesheet is injected on every linkedin.com page (the manifest match is broad), at narrow viewports the rule fired regardless of any toggle. The original author had flagged the block as "kept as a no-op until verified" — this release finishes that verification by deleting it.
 
 ### Internal
 - **CSS namespace guard test.** `tests/css-namespace.test.js` statically asserts every selector in `feed.css` contains the `lj-` substring, so a future unguarded structural selector fails CI before it leaks onto LinkedIn pages Sift was never meant to touch. Includes a meta-assertion that the extractor itself would still flag the recommendations bug if reintroduced — guards the guard.

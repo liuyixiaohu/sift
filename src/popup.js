@@ -23,15 +23,15 @@ import {
   const STATS_DEFAULTS = SIFT_STATS_DEFAULTS;
 
   const STAT_LABELS = {
-    adsHidden: "Ads Hidden",
-    suggestedHidden: "Suggested Hidden",
-    recommendedHidden: "Recommended Hidden",
-    strangersHidden: "Strangers Hidden",
-    pollsHidden: "Polls Hidden",
-    celebrationsHidden: "Celebrations Hidden",
-    jobsFlagged: "Jobs Flagged",
-    keywordsHidden: "Keywords Hidden",
-    jobsScanned: "Jobs Scanned",
+    adsHidden: "Ads",
+    suggestedHidden: "Suggested",
+    recommendedHidden: "Recommended",
+    strangersHidden: "Strangers",
+    pollsHidden: "Polls",
+    celebrationsHidden: "Celebrations",
+    jobsFlagged: "Jobs flagged",
+    keywordsHidden: "Keywords",
+    jobsScanned: "Jobs scanned",
   };
 
   // === Tab switching ===
@@ -910,12 +910,12 @@ import {
     todayTitle.textContent = "Today";
     todaySection.appendChild(todayTitle);
 
-    let todayGrid = document.createElement("div");
-    todayGrid.className = "stats-grid";
+    let todayList = document.createElement("div");
+    todayList.className = "stats-list";
     Object.keys(STAT_LABELS).forEach(function (key) {
-      todayGrid.appendChild(createStatCard(stats[key] || 0, STAT_LABELS[key]));
+      todayList.appendChild(createStatRow(stats[key] || 0, STAT_LABELS[key]));
     });
-    todaySection.appendChild(todayGrid);
+    todaySection.appendChild(todayList);
     container.appendChild(todaySection);
 
     // All Time section
@@ -926,12 +926,12 @@ import {
     allTimeTitle.textContent = "All Time";
     allTimeSection.appendChild(allTimeTitle);
 
-    let allTimeGrid = document.createElement("div");
-    allTimeGrid.className = "stats-grid";
+    let allTimeList = document.createElement("div");
+    allTimeList.className = "stats-list";
     Object.keys(STAT_LABELS).forEach(function (key) {
-      allTimeGrid.appendChild(createStatCard(statsAllTime[key] || 0, STAT_LABELS[key]));
+      allTimeList.appendChild(createStatRow(statsAllTime[key] || 0, STAT_LABELS[key]));
     });
-    allTimeSection.appendChild(allTimeGrid);
+    allTimeSection.appendChild(allTimeList);
     container.appendChild(allTimeSection);
 
     // Reset Stats button
@@ -969,18 +969,18 @@ import {
     container.appendChild(resetRow);
   }
 
-  function createStatCard(number, label) {
-    let card = document.createElement("div");
-    card.className = "stat-card";
-    let numEl = document.createElement("div");
-    numEl.className = "stat-number";
-    numEl.textContent = formatNumber(number);
+  function createStatRow(number, label) {
+    let row = document.createElement("div");
+    row.className = "stat-row";
     let labelEl = document.createElement("div");
     labelEl.className = "stat-label";
     labelEl.textContent = label;
-    card.appendChild(numEl);
-    card.appendChild(labelEl);
-    return card;
+    let numEl = document.createElement("div");
+    numEl.className = "stat-number";
+    numEl.textContent = formatNumber(number);
+    row.appendChild(labelEl);
+    row.appendChild(numEl);
+    return row;
   }
 
   function formatNumber(n) {

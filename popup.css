@@ -491,29 +491,28 @@ body {
 
 /* === Stats Tab === */
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 4px 8px;
+.stats-list {
+  display: flex;
+  flex-direction: column;
 }
 
-.stat-card {
-  padding: 4px 2px;
-  text-align: center;
-}
-
-.stat-number {
-  font-size: 20px;
-  font-weight: 600;
-  color: #D9797B;
-  line-height: 1.2;
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 3px 0;
 }
 
 .stat-label {
-  font-size: 10px;
-  color: #8A939B;
-  margin-top: 2px;
-  line-height: 1.2;
+  font-size: 13px;
+  color: #1F2328;
+}
+
+.stat-number {
+  font-size: 14px;
+  font-weight: 600;
+  color: #D9797B;
+  font-variant-numeric: tabular-nums;
 }
 
 /* === Data Tab === */

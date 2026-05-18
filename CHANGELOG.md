@@ -1,5 +1,20 @@
 # Changelog
 
+## v3
+
+Stats tab redesign and a developer-hygiene fix to keep popup bundles from going stale.
+
+### Changed
+- **Stats tab is one grid, not two sections.** The previous layout repeated nine metric labels across separate "Today" and "All Time" sub-groups, forcing the eye to scan two columns to compare a single metric's daily and lifetime values. The new layout has one row per metric showing both side by side: `Ads  12 · 8.4k`. Today is bold in the accent color; all-time is muted gray; today=0 fades to beige so a wall of inactive metrics doesn't drown out the ones that actually moved today. Vertical space roughly halves; the today-vs-cumulative comparison is now one eye movement.
+
+### New
+- **Typed reset confirmation.** Both `Reset Stats` and `Reset All Data` no longer use the native `confirm()` dialog. Clicking either button replaces it in place with an inline strip: caption, text input, Cancel, Confirm. Confirm stays disabled until the typed input matches the button label (`reset stats` / `reset all data`); matching is case-insensitive with surrounding whitespace trimmed. `Enter` confirms, `Esc` cancels. The native one-click confirm gate was a single accidental click from clearing all stats; the typed phrase forces a deliberate pause.
+
+### Internal
+- **`formatNumber` spec tightened.** Lowercase `k`, no decimal at 10k+ (`14k` not `14.0K`), clean transition to `M` at 999500 — the old function emitted `1000.0K` in that band. Right-column width is now predictable across all magnitudes (`1.0k–9.9k`, `10k–999k`, `1.0M–9.9M`, `10M+`). Non-numeric / negative / `Infinity` inputs clamp to `"0"`.
+- **Pre-commit hook auto-rebuilds bundles when `src/` is staged** (#57). Husky installs the hook via the `prepare` script on `npm install`. Closes a footgun where commits to `src/` could silently ship stale root bundles — caught only by code review screenshots several iterations into a PR.
+- **In-place stats refresh keys cells by `data-stat-key` + `data-stat-period`** instead of positional `querySelectorAll` indexing. Same fast-path / full-rebuild fallback shape, less fragile to DOM changes.
+
 ## v2.18
 
 A correctness pass driven by an independent code-review round. Five merged PRs (#48 to #52). User-visible changes are small. Under the hood the diagnostic panel is now trustworthy, and Pause actually means "all filtering suspended."

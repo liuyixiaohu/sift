@@ -67,6 +67,72 @@ import {
     }, 1800);
   }
 
+  // === Typed confirmation (used to gate destructive actions) ===
+
+  function matchesPhrase(input, phrase) {
+    return input.trim().toLowerCase() === phrase;
+  }
+
+  // opts: { phrase, confirmLabel, onConfirm, onCancel }
+  function showTypedConfirm(rowEl, opts) {
+    rowEl.innerHTML = "";
+    rowEl.removeAttribute("style");
+    rowEl.className = "typed-confirm";
+
+    let caption = document.createElement("div");
+    caption.className = "typed-confirm-caption";
+    caption.textContent = 'Type "' + opts.phrase + '" to confirm';
+
+    let input = document.createElement("input");
+    input.type = "text";
+    input.className = "typed-confirm-input";
+    input.placeholder = opts.phrase;
+    input.autocomplete = "off";
+    input.spellcheck = false;
+
+    let actions = document.createElement("div");
+    actions.className = "typed-confirm-actions";
+
+    let cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "typed-confirm-cancel";
+    cancelBtn.textContent = "Cancel";
+
+    let confirmBtn = document.createElement("button");
+    confirmBtn.type = "button";
+    confirmBtn.className = "data-btn data-btn-reset typed-confirm-confirm";
+    confirmBtn.textContent = opts.confirmLabel;
+    confirmBtn.disabled = true;
+
+    function refreshValidity() {
+      confirmBtn.disabled = !matchesPhrase(input.value, opts.phrase);
+    }
+
+    input.addEventListener("input", refreshValidity);
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (matchesPhrase(input.value, opts.phrase)) opts.onConfirm();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        opts.onCancel();
+      }
+    });
+    cancelBtn.addEventListener("click", function () { opts.onCancel(); });
+    confirmBtn.addEventListener("click", function () {
+      if (!matchesPhrase(input.value, opts.phrase)) return;
+      opts.onConfirm();
+    });
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(confirmBtn);
+    rowEl.appendChild(caption);
+    rowEl.appendChild(input);
+    rowEl.appendChild(actions);
+
+    setTimeout(function () { input.focus(); }, 0);
+  }
+
   // === Helper: create toggle row ===
 
   function createToggle(label, checked, onChange) {
@@ -870,24 +936,33 @@ import {
 
     // Reset Stats button
     let resetRow = document.createElement("div");
-    resetRow.style.cssText = "text-align:center;margin-top:12px;";
+    resetRow.className = "stats-reset-row";
+    resetRow.style.cssText = "text-align:center;margin-top:8px;";
     let resetBtn = document.createElement("button");
     resetBtn.className = "data-btn data-btn-reset";
     resetBtn.textContent = "Reset Stats";
     resetBtn.style.cssText = "font-size:12px;padding:4px 14px;";
     resetBtn.addEventListener("click", function () {
-      if (!confirm("Reset all stats to zero?")) return;
-      chrome.storage.local.set(STATS_DEFAULTS, function () {
-        if (chrome.runtime.lastError) {
-          console.error(
-            "[Sift] stats reset failed:",
-            chrome.runtime.lastError.message
-          );
-          showToast("Reset failed: " + chrome.runtime.lastError.message);
-          return;
-        }
-        buildStatsTab(STATS_DEFAULTS.stats, STATS_DEFAULTS.statsAllTime);
-        showToast("Stats reset");
+      showTypedConfirm(resetRow, {
+        phrase: "reset stats",
+        confirmLabel: "Reset Stats",
+        onCancel: function () {
+          buildStatsTab(stats, statsAllTime);
+        },
+        onConfirm: function () {
+          chrome.storage.local.set(STATS_DEFAULTS, function () {
+            if (chrome.runtime.lastError) {
+              console.error(
+                "[Sift] stats reset failed:",
+                chrome.runtime.lastError.message
+              );
+              showToast("Reset failed: " + chrome.runtime.lastError.message);
+              return;
+            }
+            buildStatsTab(STATS_DEFAULTS.stats, STATS_DEFAULTS.statsAllTime);
+            showToast("Stats reset");
+          });
+        },
       });
     });
     resetRow.appendChild(resetBtn);
@@ -1102,34 +1177,42 @@ import {
       "Restore from a previously exported backup. Older backups (no schema version) are auto-migrated.";
 
     // Reset
+    let resetRow = document.createElement("div");
+    resetRow.className = "data-reset-row";
+
     let resetBtn = document.createElement("button");
     resetBtn.className = "data-btn data-btn-reset";
     resetBtn.textContent = "Reset All Data";
-    resetBtn.addEventListener("click", function () {
-      if (
-        confirm(
-          "Are you sure you want to reset all Sift settings and stats? This cannot be undone."
-        )
-      ) {
-        chrome.storage.local.clear(function () {
-          if (chrome.runtime.lastError) {
-            console.error(
-              "[Sift] storage.clear failed:",
-              chrome.runtime.lastError.message
-            );
-            showToast("Reset failed: " + chrome.runtime.lastError.message);
-            return;
-          }
-          showToast("All data cleared");
-          refreshStorageUsage(usageEl);
-          loadAndBuild();
-        });
-      }
-    });
 
     let resetDesc = document.createElement("div");
     resetDesc.className = "data-description";
     resetDesc.textContent = "Clear all settings, lists, and stats";
+
+    resetBtn.addEventListener("click", function () {
+      showTypedConfirm(resetRow, {
+        phrase: "reset all data",
+        confirmLabel: "Reset All Data",
+        onCancel: function () { loadAndBuild(); },
+        onConfirm: function () {
+          chrome.storage.local.clear(function () {
+            if (chrome.runtime.lastError) {
+              console.error(
+                "[Sift] storage.clear failed:",
+                chrome.runtime.lastError.message
+              );
+              showToast("Reset failed: " + chrome.runtime.lastError.message);
+              return;
+            }
+            showToast("All data cleared");
+            refreshStorageUsage(usageEl);
+            loadAndBuild();
+          });
+        },
+      });
+    });
+
+    resetRow.appendChild(resetBtn);
+    resetRow.appendChild(resetDesc);
 
     section.appendChild(usageEl);
     section.appendChild(exportBtn);
@@ -1137,8 +1220,7 @@ import {
     section.appendChild(importBtn);
     section.appendChild(fileInput);
     section.appendChild(importDesc);
-    section.appendChild(resetBtn);
-    section.appendChild(resetDesc);
+    section.appendChild(resetRow);
 
     container.appendChild(section);
   }

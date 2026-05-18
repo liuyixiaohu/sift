@@ -491,50 +491,28 @@ body {
 
 /* === Stats Tab === */
 
-.stats-section {
-  margin-bottom: 16px;
+.stats-list {
+  display: flex;
+  flex-direction: column;
 }
 
-.stats-section:last-child {
-  margin-bottom: 0;
-}
-
-.stats-section-title {
-  font-size: 11px;
-  font-weight: 600;
-  color: #5A636B;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding-bottom: 8px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid #E4DDD2;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-
-.stat-card {
-  background: #fff;
-  border: 1px solid #E4DDD2;
-  border-radius: 8px;
-  padding: 10px 12px;
-  text-align: center;
-}
-
-.stat-number {
-  font-size: 22px;
-  font-weight: 700;
-  color: #D9797B;
-  line-height: 1.2;
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 3px 0;
 }
 
 .stat-label {
-  font-size: 11px;
-  color: #5A636B;
-  margin-top: 2px;
+  font-size: 13px;
+  color: #1F2328;
+}
+
+.stat-number {
+  font-size: 14px;
+  font-weight: 600;
+  color: #D9797B;
+  font-variant-numeric: tabular-nums;
 }
 
 /* === Data Tab === */
@@ -619,6 +597,76 @@ body {
 
 .data-file-input {
   display: none;
+}
+
+/* === Typed Confirm (inline destructive-action gate) === */
+
+.typed-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.typed-confirm-caption {
+  font-size: 11px;
+  color: #5A636B;
+}
+
+.typed-confirm-input {
+  width: 180px;
+  padding: 4px 8px;
+  border: 1px solid #E4DDD2;
+  border-radius: 6px;
+  background: #fff;
+  font-family: 'EB Garamond', Garamond, serif;
+  font-size: 12px;
+  color: #1F2328;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.typed-confirm-input:focus {
+  border-color: #D9797B;
+}
+
+.typed-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.typed-confirm-cancel {
+  background: transparent;
+  color: #5A636B;
+  border: 1px solid #E4DDD2;
+  border-radius: 8px;
+  font-family: 'EB Garamond', Garamond, serif;
+  font-size: 12px;
+  padding: 4px 14px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.typed-confirm-cancel:hover {
+  border-color: #1F2328;
+  color: #1F2328;
+}
+
+.typed-confirm-confirm {
+  width: auto;
+  font-size: 12px;
+  padding: 4px 14px;
+}
+
+.typed-confirm-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.typed-confirm-confirm:disabled:hover {
+  background: none;
+  color: #D9797B;
 }
 
 /* === Toast === */

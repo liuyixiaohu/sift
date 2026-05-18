@@ -492,7 +492,7 @@ body {
 /* === Stats Tab === */
 
 .stats-section {
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 
 .stats-section:last-child {
@@ -500,40 +500,35 @@ body {
 }
 
 .stats-section-title {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  color: #5A636B;
+  color: #8a8780;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  padding-bottom: 6px;
-  margin-bottom: 6px;
-  border-bottom: 1px solid #E4DDD2;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
 }
 
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
+  gap: 4px 8px;
 }
 
 .stat-card {
-  background: #fff;
-  border: 1px solid #E4DDD2;
-  border-radius: 8px;
-  padding: 8px 6px;
+  padding: 4px 2px;
   text-align: center;
 }
 
 .stat-number {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 20px;
+  font-weight: 600;
   color: #D9797B;
   line-height: 1.2;
 }
 
 .stat-label {
-  font-size: 11px;
-  color: #5A636B;
+  font-size: 10px;
+  color: #8a8780;
   margin-top: 2px;
   line-height: 1.2;
 }

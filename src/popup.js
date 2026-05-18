@@ -904,9 +904,9 @@ import {
 
     // Today section
     let todaySection = document.createElement("div");
-    todaySection.className = "stats-section";
+    todaySection.className = "sub-group";
     let todayTitle = document.createElement("div");
-    todayTitle.className = "stats-section-title";
+    todayTitle.className = "sub-group-title";
     todayTitle.textContent = "Today";
     todaySection.appendChild(todayTitle);
 
@@ -920,9 +920,9 @@ import {
 
     // All Time section
     let allTimeSection = document.createElement("div");
-    allTimeSection.className = "stats-section";
+    allTimeSection.className = "sub-group";
     let allTimeTitle = document.createElement("div");
-    allTimeTitle.className = "stats-section-title";
+    allTimeTitle.className = "sub-group-title";
     allTimeTitle.textContent = "All Time";
     allTimeSection.appendChild(allTimeTitle);
 

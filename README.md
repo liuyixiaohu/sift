@@ -82,6 +82,10 @@ Every push and PR runs the same lint / format / test / build sequence in [GitHub
 
 `tests/selectors.test.js` and `tests/fixtures/*.html` pin the structural assumptions our markers depend on against captured LinkedIn DOM. When LinkedIn renames a class or restructures a widget, these tests fail with a specific signal instead of users silently losing filtering. Fixtures were calibrated against live LinkedIn DOM via the Claude in Chrome MCP. When re-capturing after a future LinkedIn change, do NOT auto-update the fixture blindly. The failure IS the early-warning signal.
 
+### Manual page coverage
+
+`docs/MANUAL-TEST-MATRIX.md` is the smoke test for layout regressions across LinkedIn's full page surface. Run the Tier 1 routes at default and 1024px width before each release; the narrow-viewport column catches the class of bug where an unguarded CSS selector leaks onto a page Sift was never meant to touch.
+
 ## Design
 
 Cream and rose brand palette with EB Garamond typography. All settings persist across sessions via `chrome.storage.local`.

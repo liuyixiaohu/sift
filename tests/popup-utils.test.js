@@ -8,9 +8,7 @@ function formatNumber(n) {
   if (n < 999500) {
     return n < 9950 ? (n / 1000).toFixed(1) + "k" : Math.round(n / 1000) + "k";
   }
-  return n < 9950000
-    ? (n / 1000000).toFixed(1) + "M"
-    : Math.round(n / 1000000) + "M";
+  return n < 9950000 ? (n / 1000000).toFixed(1) + "M" : Math.round(n / 1000000) + "M";
 }
 
 describe("formatNumber", () => {

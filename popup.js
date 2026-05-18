@@ -285,15 +285,15 @@
     const CONTROLS_DEFAULTS = SIFT_DEFAULTS;
     const STATS_DEFAULTS = SIFT_STATS_DEFAULTS;
     const STAT_LABELS = {
-      adsHidden: "Ads Hidden",
-      suggestedHidden: "Suggested Hidden",
-      recommendedHidden: "Recommended Hidden",
-      strangersHidden: "Strangers Hidden",
-      pollsHidden: "Polls Hidden",
-      celebrationsHidden: "Celebrations Hidden",
-      jobsFlagged: "Jobs Flagged",
-      keywordsHidden: "Keywords Hidden",
-      jobsScanned: "Jobs Scanned"
+      adsHidden: "Ads",
+      suggestedHidden: "Suggested",
+      recommendedHidden: "Recommended",
+      strangersHidden: "Strangers",
+      pollsHidden: "Polls",
+      celebrationsHidden: "Celebrations",
+      jobsFlagged: "Jobs flagged",
+      keywordsHidden: "Keywords",
+      jobsScanned: "Jobs scanned"
     };
     const tabBtns = document.querySelectorAll(".tab-btn");
     const tabContents = document.querySelectorAll(".tab-content");
@@ -323,6 +323,62 @@
       toastTimer = setTimeout(function() {
         toastEl.classList.remove("visible");
       }, 1800);
+    }
+    function matchesPhrase(input, phrase) {
+      return input.trim().toLowerCase() === phrase;
+    }
+    function showTypedConfirm(rowEl, opts) {
+      rowEl.innerHTML = "";
+      rowEl.removeAttribute("style");
+      rowEl.className = "typed-confirm";
+      let caption = document.createElement("div");
+      caption.className = "typed-confirm-caption";
+      caption.textContent = 'Type "' + opts.phrase + '" to confirm';
+      let input = document.createElement("input");
+      input.type = "text";
+      input.className = "typed-confirm-input";
+      input.placeholder = opts.phrase;
+      input.autocomplete = "off";
+      input.spellcheck = false;
+      let actions = document.createElement("div");
+      actions.className = "typed-confirm-actions";
+      let cancelBtn = document.createElement("button");
+      cancelBtn.type = "button";
+      cancelBtn.className = "typed-confirm-cancel";
+      cancelBtn.textContent = "Cancel";
+      let confirmBtn = document.createElement("button");
+      confirmBtn.type = "button";
+      confirmBtn.className = "data-btn data-btn-reset typed-confirm-confirm";
+      confirmBtn.textContent = opts.confirmLabel;
+      confirmBtn.disabled = true;
+      function refreshValidity() {
+        confirmBtn.disabled = !matchesPhrase(input.value, opts.phrase);
+      }
+      input.addEventListener("input", refreshValidity);
+      input.addEventListener("keydown", function(e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (matchesPhrase(input.value, opts.phrase)) opts.onConfirm();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          opts.onCancel();
+        }
+      });
+      cancelBtn.addEventListener("click", function() {
+        opts.onCancel();
+      });
+      confirmBtn.addEventListener("click", function() {
+        if (!matchesPhrase(input.value, opts.phrase)) return;
+        opts.onConfirm();
+      });
+      actions.appendChild(cancelBtn);
+      actions.appendChild(confirmBtn);
+      rowEl.appendChild(caption);
+      rowEl.appendChild(input);
+      rowEl.appendChild(actions);
+      setTimeout(function() {
+        input.focus();
+      }, 0);
     }
     function createToggle(label, checked, onChange) {
       let row = document.createElement("div");
@@ -908,67 +964,76 @@
         chrome.storage.local.set({ stats });
       }
       let todaySection = document.createElement("div");
-      todaySection.className = "stats-section";
+      todaySection.className = "sub-group";
       let todayTitle = document.createElement("div");
-      todayTitle.className = "stats-section-title";
+      todayTitle.className = "sub-group-title";
       todayTitle.textContent = "Today";
       todaySection.appendChild(todayTitle);
-      let todayGrid = document.createElement("div");
-      todayGrid.className = "stats-grid";
+      let todayList = document.createElement("div");
+      todayList.className = "stats-list";
       Object.keys(STAT_LABELS).forEach(function(key) {
-        todayGrid.appendChild(createStatCard(stats[key] || 0, STAT_LABELS[key]));
+        todayList.appendChild(createStatRow(stats[key] || 0, STAT_LABELS[key]));
       });
-      todaySection.appendChild(todayGrid);
+      todaySection.appendChild(todayList);
       container.appendChild(todaySection);
       let allTimeSection = document.createElement("div");
-      allTimeSection.className = "stats-section";
+      allTimeSection.className = "sub-group";
       let allTimeTitle = document.createElement("div");
-      allTimeTitle.className = "stats-section-title";
+      allTimeTitle.className = "sub-group-title";
       allTimeTitle.textContent = "All Time";
       allTimeSection.appendChild(allTimeTitle);
-      let allTimeGrid = document.createElement("div");
-      allTimeGrid.className = "stats-grid";
+      let allTimeList = document.createElement("div");
+      allTimeList.className = "stats-list";
       Object.keys(STAT_LABELS).forEach(function(key) {
-        allTimeGrid.appendChild(createStatCard(statsAllTime[key] || 0, STAT_LABELS[key]));
+        allTimeList.appendChild(createStatRow(statsAllTime[key] || 0, STAT_LABELS[key]));
       });
-      allTimeSection.appendChild(allTimeGrid);
+      allTimeSection.appendChild(allTimeList);
       container.appendChild(allTimeSection);
       let resetRow = document.createElement("div");
-      resetRow.style.cssText = "text-align:center;margin-top:12px;";
+      resetRow.className = "stats-reset-row";
+      resetRow.style.cssText = "text-align:center;margin-top:8px;";
       let resetBtn = document.createElement("button");
       resetBtn.className = "data-btn data-btn-reset";
       resetBtn.textContent = "Reset Stats";
       resetBtn.style.cssText = "font-size:12px;padding:4px 14px;";
       resetBtn.addEventListener("click", function() {
-        if (!confirm("Reset all stats to zero?")) return;
-        chrome.storage.local.set(STATS_DEFAULTS, function() {
-          if (chrome.runtime.lastError) {
-            console.error(
-              "[Sift] stats reset failed:",
-              chrome.runtime.lastError.message
-            );
-            showToast("Reset failed: " + chrome.runtime.lastError.message);
-            return;
+        showTypedConfirm(resetRow, {
+          phrase: "reset stats",
+          confirmLabel: "Reset Stats",
+          onCancel: function() {
+            buildStatsTab(stats, statsAllTime);
+          },
+          onConfirm: function() {
+            chrome.storage.local.set(STATS_DEFAULTS, function() {
+              if (chrome.runtime.lastError) {
+                console.error(
+                  "[Sift] stats reset failed:",
+                  chrome.runtime.lastError.message
+                );
+                showToast("Reset failed: " + chrome.runtime.lastError.message);
+                return;
+              }
+              buildStatsTab(STATS_DEFAULTS.stats, STATS_DEFAULTS.statsAllTime);
+              showToast("Stats reset");
+            });
           }
-          buildStatsTab(STATS_DEFAULTS.stats, STATS_DEFAULTS.statsAllTime);
-          showToast("Stats reset");
         });
       });
       resetRow.appendChild(resetBtn);
       container.appendChild(resetRow);
     }
-    function createStatCard(number, label) {
-      let card = document.createElement("div");
-      card.className = "stat-card";
-      let numEl = document.createElement("div");
-      numEl.className = "stat-number";
-      numEl.textContent = formatNumber(number);
+    function createStatRow(number, label) {
+      let row = document.createElement("div");
+      row.className = "stat-row";
       let labelEl = document.createElement("div");
       labelEl.className = "stat-label";
       labelEl.textContent = label;
-      card.appendChild(numEl);
-      card.appendChild(labelEl);
-      return card;
+      let numEl = document.createElement("div");
+      numEl.className = "stat-number";
+      numEl.textContent = formatNumber(number);
+      row.appendChild(labelEl);
+      row.appendChild(numEl);
+      return row;
     }
     function formatNumber(n) {
       if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
@@ -1108,39 +1173,47 @@
       let importDesc = document.createElement("div");
       importDesc.className = "data-description";
       importDesc.textContent = "Restore from a previously exported backup. Older backups (no schema version) are auto-migrated.";
+      let resetRow = document.createElement("div");
+      resetRow.className = "data-reset-row";
       let resetBtn = document.createElement("button");
       resetBtn.className = "data-btn data-btn-reset";
       resetBtn.textContent = "Reset All Data";
-      resetBtn.addEventListener("click", function() {
-        if (confirm(
-          "Are you sure you want to reset all Sift settings and stats? This cannot be undone."
-        )) {
-          chrome.storage.local.clear(function() {
-            if (chrome.runtime.lastError) {
-              console.error(
-                "[Sift] storage.clear failed:",
-                chrome.runtime.lastError.message
-              );
-              showToast("Reset failed: " + chrome.runtime.lastError.message);
-              return;
-            }
-            showToast("All data cleared");
-            refreshStorageUsage(usageEl);
-            loadAndBuild();
-          });
-        }
-      });
       let resetDesc = document.createElement("div");
       resetDesc.className = "data-description";
       resetDesc.textContent = "Clear all settings, lists, and stats";
+      resetBtn.addEventListener("click", function() {
+        showTypedConfirm(resetRow, {
+          phrase: "reset all data",
+          confirmLabel: "Reset All Data",
+          onCancel: function() {
+            loadAndBuild();
+          },
+          onConfirm: function() {
+            chrome.storage.local.clear(function() {
+              if (chrome.runtime.lastError) {
+                console.error(
+                  "[Sift] storage.clear failed:",
+                  chrome.runtime.lastError.message
+                );
+                showToast("Reset failed: " + chrome.runtime.lastError.message);
+                return;
+              }
+              showToast("All data cleared");
+              refreshStorageUsage(usageEl);
+              loadAndBuild();
+            });
+          }
+        });
+      });
+      resetRow.appendChild(resetBtn);
+      resetRow.appendChild(resetDesc);
       section.appendChild(usageEl);
       section.appendChild(exportBtn);
       section.appendChild(exportDesc);
       section.appendChild(importBtn);
       section.appendChild(fileInput);
       section.appendChild(importDesc);
-      section.appendChild(resetBtn);
-      section.appendChild(resetDesc);
+      section.appendChild(resetRow);
       container.appendChild(section);
     }
     function loadAndBuild() {

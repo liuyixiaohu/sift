@@ -13,13 +13,15 @@
     "lint:fix": "eslint --fix src tests build.js eslint.config.js pack.js",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "pack": "node pack.js"
+    "pack": "node pack.js",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "esbuild": "^0.25.0",
     "eslint": "^10.3.0",
     "globals": "^17.6.0",
+    "husky": "^9.1.7",
     "linkedom": "^0.18.12",
     "prettier": "^3.8.3",
     "vitest": "^3.0.0"

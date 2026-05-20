@@ -1,0 +1,12 @@
+# Rebuild + re-stage esbuild bundles when src/ files are staged,
+# so root popup.js/content.js/feed.js/background.js never ship stale.
+
+if git diff --cached --name-only | grep -q '^src/'; then
+  echo "[pre-commit] src/ change detected, running npm run build..."
+  if ! npm run build; then
+    echo "" >&2
+    echo "[pre-commit] Build failed. Commit aborted." >&2
+    exit 1
+  fi
+  git add popup.js content.js feed.js background.js
+fi

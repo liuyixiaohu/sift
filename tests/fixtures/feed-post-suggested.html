@@ -1,6 +1,9 @@
 <!--
   Feed-post fixture: a "Suggested" article — same structural shape as the
-  Promoted fixture but with a different leaf label.
+  Promoted fixture (2026-05-29 DOM): a direct-child `<div data-lazy-mount-id>`
+  of `<div role="list">` containing a deep `[role="listitem"]`. NO
+  `data-display-contents` — feed.js#feedPosts identifies posts by the presence
+  of a `[role="listitem"]`.
 
   The "Suggested" label is a leaf <span> with EXACT text "Suggested" (not
   "Suggested for you" — that's the profile-widget heading, a different thing).
@@ -10,7 +13,7 @@
   <body>
     <main>
       <div role="list">
-        <div data-display-contents="true">
+        <div data-lazy-mount-id="a1b2c3d4">
           <div>
             <div role="listitem">
               <div>

@@ -98,4 +98,6 @@ When a run finds a bug, log it here with the URL, what was wrong, and the resolu
 | Date | URL | Symptom | Root cause | Fix |
 |---|---|---|---|---|
 | 2026-05-18 | `/in/{user}/details/recommendations/?detailScreenTabIndex=2` | Recommendations list blank at narrow viewport | Unguarded `@media (max-width: 1100px)` structural selector in `feed.css` | Deleted the entire `@media` block |
+| 2026-05-29 | `/feed/` | Promoted/Suggested posts leak through; nothing hidden | LinkedIn dropped `data-display-contents` from post wrappers (moved it into asides/menus) and removed `[role="article"]`, so `feedPosts()` matched 0 posts and nothing got tagged | `feedPosts()` now selects `[role="list"]` direct children containing a `[role="listitem"]`; legacy `[data-display-contents]` / `[role="article"]` kept as fallbacks |
+| 2026-05-29 | `/in/{user}/` | Hide Analytics no longer hides the dashboard widget | LinkedIn completed the `/dashboard`→`/analytics` rollout AND dropped the leaf "Analytics" heading; the `/analytics` substring is unsafe (activity posts link to `/analytics/post-summary/...`) | DEFERRED — needs live re-capture of the analytics widget DOM (not rendered during 2026-05-29 inspection) before choosing a structural anchor |
 

@@ -234,10 +234,14 @@
     }, feedPosts = function(container) {
       const list = container.querySelector('[role="list"]');
       if (list) {
-        const posts = list.querySelectorAll(":scope > [data-display-contents]");
+        const posts = [...list.children].filter(
+          (c) => c.matches('[role="listitem"]') || c.querySelector('[role="listitem"]')
+        );
         if (posts.length) return posts;
+        const legacy = [...list.querySelectorAll(":scope > [data-display-contents]")];
+        if (legacy.length) return legacy;
       }
-      return container.querySelectorAll('[role="article"]');
+      return [...container.querySelectorAll('[role="article"]')];
     }, scanPosts = function() {
       if (feedDoc !== document && !feedDoc.defaultView) updateFeedDoc();
       const main = feedMain();

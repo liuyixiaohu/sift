@@ -151,15 +151,31 @@ if (chrome.runtime?.id) {
     return feedDoc.querySelector('main[role="main"]') || feedDoc.querySelector("main");
   }
 
-  // LinkedIn 2026 DOM: posts are div[data-display-contents] inside role="list".
-  // Falls back to legacy [role="article"] for older layouts.
+  // LinkedIn 2026-05 DOM: the feed is a single [role="list"] whose direct-child
+  // <div>s are post wrappers (data-lazy-mount-id + hashed classnames). Real
+  // posts are the children that contain a [role="listitem"]; non-posts (the
+  // "Start a post" composer, "Sort by", the "New posts" pill, empty
+  // placeholders) do not. We match on the stable ARIA [role="listitem"] rather
+  // than the churning class/lazy-mount attributes.
+  //
+  // Fallbacks for older cohorts: legacy [data-display-contents] direct-child
+  // wrappers, then legacy [role="article"]. The listitem filter is
+  // backward-compatible — the pre-2026 [data-display-contents] wrapper also
+  // contains a [role="listitem"], so it matches in the primary branch and the
+  // fallbacks only fire when [role="list"] itself is absent.
+  //
+  // Returns an Array (uniform type; every call site iterates with for...of).
   function feedPosts(container) {
     const list = container.querySelector('[role="list"]');
     if (list) {
-      const posts = list.querySelectorAll(':scope > [data-display-contents]');
+      const posts = [...list.children].filter(
+        (c) => c.matches('[role="listitem"]') || c.querySelector('[role="listitem"]')
+      );
       if (posts.length) return posts;
+      const legacy = [...list.querySelectorAll(':scope > [data-display-contents]')];
+      if (legacy.length) return legacy;
     }
-    return container.querySelectorAll('[role="article"]');
+    return [...container.querySelectorAll('[role="article"]')];
   }
 
   // Scan and tag all posts, then flush stats in a single storage write

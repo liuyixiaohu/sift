@@ -65,6 +65,17 @@ function findNoiseWrapper(headingEl) {
   return null;
 }
 
+// Mirror of src/feed.js#feedPosts' primary 2026-05 filter: posts are the
+// [role="list"] direct children that contain a [role="listitem"]. Kept inline
+// because feed.js is an IIFE with no exports — same convention as
+// findNoiseWrapper above. If this drifts from feed.js the smoke test stops
+// catching real breakage.
+function feedPostsIn(list) {
+  return [...list.children].filter(
+    (c) => c.matches('[role="listitem"]') || c.querySelector('[role="listitem"]')
+  );
+}
+
 describe("Profile page selectors", () => {
   const doc = parseFixture("profile-page.html");
 
@@ -218,25 +229,39 @@ describe("Feed post type labels", () => {
     expect(suggested).toBeTruthy();
   });
 
-  it("feed posts live inside [role='list'] > [data-display-contents] (direct child)", () => {
-    // LinkedIn's 2026 DOM. feed.js#feedPosts queries this primarily and
-    // falls back to legacy [role="article"]. The :scope > direct-child
-    // match is precise — without it, deeply nested [data-display-contents]
-    // descendants (LinkedIn uses 254+ of those!) would all get treated
-    // as posts.
+  it("feed posts are [role='list'] direct children containing a [role='listitem']", () => {
+    // 2026-05 DOM: LinkedIn dropped [data-display-contents] from post wrappers
+    // and moved those into asides/menus. feed.js#feedPosts now identifies posts
+    // as [role="list"] direct-child divs that contain a [role="listitem"].
     const doc = parseFixture("feed-post-promoted.html");
     const list = doc.querySelector('[role="list"]');
     expect(list).toBeTruthy();
-    const directChildren = list.querySelectorAll(":scope > [data-display-contents]");
-    expect(directChildren.length).toBeGreaterThan(0);
+    const posts = feedPostsIn(list);
+    expect(posts.length).toBe(1); // the real post, NOT the composer sibling
+    expect(posts[0].querySelector('[role="listitem"]')).toBeTruthy();
+    // Wrapper carries data-lazy-mount-id (corroborating signal, not matched on).
+    expect(posts[0].hasAttribute("data-lazy-mount-id")).toBe(true);
+  });
+
+  it("feedPosts excludes a composer-like sibling with no [role='listitem']", () => {
+    // The "Start a post" composer, "Sort by", and the "New posts" pill are also
+    // [role="list"] direct children but contain NO [role="listitem"]. Regression
+    // guard: a naive `[role="list"] > div` selector would wrongly include them.
+    const doc = parseFixture("feed-post-promoted.html");
+    const list = doc.querySelector('[role="list"]');
+    const composer = [...list.children].find((c) =>
+      c.querySelector('button[aria-label="Start a post"]')
+    );
+    expect(composer).toBeTruthy(); // sibling exists in fixture
+    expect(feedPostsIn(list)).not.toContain(composer); // and is excluded
   });
 
   it("Post wrapper contains a [role='listitem'] several divs deep", () => {
-    // Real DOM nests [role="listitem"] inside the outer [data-display-contents]
-    // wrapper with multiple intermediate divs. The "Promoted" label leaf is
-    // found by a deep `span,a,p` traversal — no assumption about depth.
+    // Real DOM nests [role="listitem"] inside the outer wrapper with multiple
+    // intermediate divs. The "Promoted" label leaf is found by a deep
+    // `span,a,p` traversal — no assumption about depth.
     const doc = parseFixture("feed-post-promoted.html");
-    const post = doc.querySelector('[role="list"] > [data-display-contents]');
+    const post = feedPostsIn(doc.querySelector('[role="list"]'))[0];
     expect(post.querySelector('[role="listitem"]')).toBeTruthy();
   });
 

@@ -93,7 +93,13 @@ body.lj-hide-old-posts [data-lj-too-old="true"] {
   flex-shrink: 0;
 }
 
-/* Show on hover over the post */
+/* Show on hover over the post.
+ * 2026-05 DOM: post wrappers are [role="listitem"] (no [role="article"] /
+ * [data-display-contents] anymore — see feed.js#feedPosts). Keep the legacy
+ * triggers for older cohorts; extra non-matching selectors are harmless. Every
+ * comma fragment keeps .lj-unfollow-btn so tests/css-namespace.test.js (which
+ * requires "lj-" in each fragment) stays green. */
+[role="listitem"]:hover .lj-unfollow-btn,
 [role="article"]:hover .lj-unfollow-btn,
 [data-display-contents]:hover .lj-unfollow-btn {
   opacity: 0.7;

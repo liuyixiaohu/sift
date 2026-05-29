@@ -1,36 +1,41 @@
 <!--
   Feed-post fixture: a "Promoted" article — calibrated against live LinkedIn
-  DOM (captured 2026-05).
+  DOM (captured 2026-05-29).
 
-  KEY REAL-WORLD STRUCTURE:
+  KEY REAL-WORLD STRUCTURE (changed in the 2026-05 LinkedIn DOM update):
 
   1. <main> has NO `role="main"` (bare <main>).
 
-  2. Posts are direct children of `<div role="list">` — the wrapper is a
-     `<div role="list">`, NOT a `<ul>` or `<ol>`. feed.js#feedPosts queries
-     `[role="list"]` for this reason.
+  2. The feed is a single `<div role="list">`. Its DIRECT-CHILD <div>s are post
+     wrappers carrying `data-lazy-mount-id` and hashed class names. The old
+     `data-display-contents` marker is GONE from feed posts (LinkedIn moved it
+     into asides/menus).
 
-  3. Posts wrap as `<div data-display-contents="true">` direct children of
-     `[role="list"]`. feed.js#feedPosts uses `:scope > [data-display-contents]`
-     to find them — direct-child match is what makes that query precise.
+  3. A wrapper is a real post iff it contains a `[role="listitem"]`. Non-post
+     direct children (the "Start a post" composer, "Sort by", the "New posts"
+     pill, empty placeholders) do NOT contain a listitem. feed.js#feedPosts
+     filters on that signal — NOT on `data-display-contents` anymore.
 
-  4. Inside the outer [data-display-contents] there's a <div role="listitem">
-     several divs deep, containing the actual post content + the leaf
-     "Promoted" label.
+  4. Inside the wrapper there's a <div role="listitem"> several divs deep,
+     containing the actual post content + the leaf "Promoted" label.
 
   5. The "Promoted" label is a leaf <span> with EXACT text "Promoted".
      detectPostLabels walks all span/a/p leaves looking for POST_TYPE_LABELS.
 
   6. Follow button has aria-label STARTING WITH "Follow" (not exact match).
      The non-connection signal uses `button[aria-label*="Follow"]`.
+
+  The second wrapper below (the composer) backs the regression test that
+  feedPosts EXCLUDES `[role="list"]` children with no `[role="listitem"]`.
 -->
 <!doctype html>
 <html lang="en">
   <body>
     <main>
       <div role="list">
-        <!-- Outer post wrapper — direct child of [role="list"] -->
-        <div data-display-contents="true">
+        <!-- Real post: direct child of [role="list"] carrying data-lazy-mount-id,
+             containing a [role="listitem"] several divs deep. NO data-display-contents. -->
+        <div data-lazy-mount-id="f3335b76">
           <div>
             <div role="listitem">
               <div>
@@ -45,6 +50,12 @@
               </div>
             </div>
           </div>
+        </div>
+        <!-- Composer-like sibling: a [role="list"] child with NO [role="listitem"].
+             feedPosts must EXCLUDE this (regression guard against a naive
+             `[role="list"] > div` selector). -->
+        <div data-lazy-mount-id="composer-0">
+          <div><button aria-label="Start a post">Start a post</button></div>
         </div>
       </div>
     </main>

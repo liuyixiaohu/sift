@@ -480,7 +480,7 @@
         Boolean
       ) : [...root.querySelectorAll("aside[aria-label]")];
       for (const scope of scopes) {
-        scope.querySelectorAll("h1, h2, h3, h4, p").forEach((el) => {
+        scope.querySelectorAll("h1, h2, h3, h4, p, span").forEach((el) => {
           if (el.children.length > 0) return;
           const text = (el.textContent || "").trim();
           if (PROFILE_NOISE_HEADINGS.has(text)) {
@@ -520,9 +520,8 @@
       profileInitialized = true;
       loadSettings(() => {
         applyProfileClasses();
-        [500, 1500, 3e3, 6e3].forEach((delay) => {
-          setTimeout(markProfileNoise, delay);
-        });
+        if (profileScanInterval) clearInterval(profileScanInterval);
+        profileScanInterval = setInterval(markProfileNoise, PROFILE_SCAN_INTERVAL_MS);
       });
     }, teardownProfile = function() {
       if (!profileInitialized) return;
@@ -531,7 +530,10 @@
         "lj-hide-profile-analytics",
         "lj-hide-profile-suggestions"
       );
-      if (profileNoiseRetryTimer) clearTimeout(profileNoiseRetryTimer);
+      if (profileScanInterval) {
+        clearInterval(profileScanInterval);
+        profileScanInterval = null;
+      }
     }, hideNetworkAds = function() {
       const active = !settings.siftPaused;
       if (active) {
@@ -752,7 +754,8 @@
     let pendingStats = {};
     let toastTimer = null;
     let profileInitialized = false;
-    let profileNoiseRetryTimer = null;
+    const PROFILE_SCAN_INTERVAL_MS = 1500;
+    let profileScanInterval = null;
     const PROFILE_NOISE_HEADINGS = /* @__PURE__ */ new Set([
       // Profile page
       "Suggested for you",

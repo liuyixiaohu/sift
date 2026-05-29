@@ -1,6 +1,6 @@
 <!--
   Profile-page fixture — structurally calibrated against live LinkedIn DOM
-  (captured 2026-05, /in/<user>/).
+  (captured 2026-05-29, /in/<user>/).
 
   KEY DEPARTURES from a naïve hand-written fixture:
 
@@ -27,6 +27,11 @@
   6. Multiple intermediate <div> layers exist in real DOM (~7 between heading
      and aside). We include 2-3 here — enough to exercise the up-walk in
      findNoiseWrapper without bloating the fixture.
+
+  7. SPAN-WRAPPED HEADING: the Premium "Who your viewers also viewed" widget
+     renders its title as `<h3><span>…</span></h3>` — so the <h3> is NOT a
+     leaf; the <span> is. markProfileNoise's heading query must include `span`
+     to catch it (the other widgets use a bare <h2> with direct text).
 -->
 <!doctype html>
 <html lang="en">
@@ -63,6 +68,16 @@
 
       <!-- ASIDE inside MAIN (LinkedIn's actual nesting) -->
       <aside aria-label="Aside">
+        <!-- Premium widget: heading text wrapped in <span> inside <h3> -->
+        <section>
+          <div>
+            <div>
+              <h3><span>Who your viewers also viewed</span></h3>
+              <p>Private to you</p>
+            </div>
+          </div>
+        </section>
+
         <section>
           <div>
             <div>

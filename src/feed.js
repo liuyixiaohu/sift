@@ -449,7 +449,14 @@ if (chrome.runtime?.id) {
 
   // === Profile page: apply sidebar + analytics + suggestions body classes ===
   let profileInitialized = false;
-  let profileNoiseRetryTimer = null;
+  // LinkedIn hydrates profile widgets (Premium "Who your viewers also viewed",
+  // analytics, "People you may know", etc.) progressively — often past the
+  // first few seconds, and more on scroll. A finite retry schedule misses those
+  // late loads, so we re-mark on a cheap interval (markProfileNoise bails on
+  // already-tagged wrappers). Mirrors the feed's continuous scan; a
+  // MutationObserver fires 0 mutations on LinkedIn's 2026 DOM (see §24).
+  const PROFILE_SCAN_INTERVAL_MS = 1500;
+  let profileScanInterval = null;
 
   // Heading texts at the top of each "noise" widget that the
   // hideProfileSuggestions toggle should hide. CSS can't match on text
@@ -528,8 +535,12 @@ if (chrome.runtime?.id) {
       : [...root.querySelectorAll("aside[aria-label]")];
 
     for (const scope of scopes) {
-      // Heading-like leaves: <h1>-<h4> on profile sections, <p> on feed sidebar.
-      scope.querySelectorAll("h1, h2, h3, h4, p").forEach((el) => {
+      // Heading-like leaves: <h1>-<h4> on profile sections, <p> on feed sidebar,
+      // <span> for headings LinkedIn wraps in a span inside the heading tag.
+      // The Premium "Who your viewers also viewed" widget renders
+      // <h3><span>…</span></h3>, so the <h3> isn't a leaf — the <span> is; the
+      // bare-<h2> widgets still match too.
+      scope.querySelectorAll("h1, h2, h3, h4, p, span").forEach((el) => {
         if (el.children.length > 0) return; // leaf nodes only — skip wrappers
         const text = (el.textContent || "").trim();
         if (PROFILE_NOISE_HEADINGS.has(text)) {
@@ -575,12 +586,11 @@ if (chrome.runtime?.id) {
     if (profileInitialized) return;
     profileInitialized = true;
     loadSettings(() => {
-      applyProfileClasses();
-      // LinkedIn lazy-loads the right-column widgets after first paint. Retry
-      // the marker a few times to catch sections that weren't in the DOM yet.
-      [500, 1500, 3000, 6000].forEach((delay) => {
-        setTimeout(markProfileNoise, delay);
-      });
+      applyProfileClasses(); // marks once immediately
+      // Keep re-marking: LinkedIn loads many widgets well after first paint
+      // (and on scroll), past any finite retry window. Cleared in teardown.
+      if (profileScanInterval) clearInterval(profileScanInterval);
+      profileScanInterval = setInterval(markProfileNoise, PROFILE_SCAN_INTERVAL_MS);
     });
   }
 
@@ -591,7 +601,10 @@ if (chrome.runtime?.id) {
       "lj-hide-profile-analytics",
       "lj-hide-profile-suggestions"
     );
-    if (profileNoiseRetryTimer) clearTimeout(profileNoiseRetryTimer);
+    if (profileScanInterval) {
+      clearInterval(profileScanInterval);
+      profileScanInterval = null;
+    }
   }
 
   // === Network page: hide sidebar ad + game promo ===

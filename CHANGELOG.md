@@ -1,5 +1,16 @@
 # Changelog
 
+## v3.2
+
+LinkedIn shipped a feed + profile DOM refactor (hashed class names, re-nested posts, more aggressive lazy hydration). Two recovery PRs — #61 restores feed filtering, #62 hardens profile-widget hiding against late loads.
+
+### Fixed
+- **Feed filtering works again.** LinkedIn moved the `[data-display-contents]` post-wrapper marker into asides/menus and dropped `[role="article"]`, so `feedPosts()` matched zero posts — nothing got tagged and Promoted/Suggested/Recommended posts (and stranger posts) all leaked through. Posts are now identified as `[role="list"]` direct children that contain a `[role="listitem"]` (the stable ARIA signal), with the legacy selectors kept as fallbacks. Also repaired the inline Unfollow button's hover-reveal, whose old `[role="article"]` / `[data-display-contents]` hover targets no longer wrap a post.
+- **Profile suggestion + analytics widgets stop leaking past their toggles.** LinkedIn hydrates the right-rail widgets ("Who your viewers also viewed", "People you may know", "You might like", "Suggested for you", and the Analytics dashboard) progressively — often after the old fixed retry window (which stopped at 6s) and again on scroll. Late-loading widgets were never marked, so they stayed visible. `markProfileNoise` now re-marks on a persistent interval (cleared on navigation away) instead of a one-shot retry burst. The heading scan also now includes `<span>`, catching the Premium "Who your viewers also viewed" title that LinkedIn renders as `<h3><span>…</span></h3>`.
+
+### Internal
+- Feed-post and profile-page fixtures recaptured against the 2026-05 live DOM; new selector tests cover the `[role="listitem"]` post container, composer-exclusion, and the span-wrapped heading. Findings logged in `docs/MANUAL-TEST-MATRIX.md`.
+
 ## v3.1
 
 A hotfix on top of v3. Two user-visible CSS bugs of the same class — `:has()` selectors that didn't constrain to the innermost match and accidentally took out their entire wrapper section — plus the regression-prevention scaffolding so the next one fails CI.

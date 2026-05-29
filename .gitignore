@@ -2,3 +2,6 @@
 node_modules/
 .claude/
 dist/
+
+# Private engineering notes — keep LinkedIn DOM-recon details out of the public repo
+LEARNINGS.md

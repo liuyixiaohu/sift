@@ -41,7 +41,7 @@ function parseFixture(name) {
 // tests don't have to import from inside the IIFE. Same selector list +
 // leaf-only filter — if this drifts from feed.js, the smoke tests stop
 // catching real breakage.
-function findLeafHeadingWith(document, text, headingSelector = "h1, h2, h3, h4, p") {
+function findLeafHeadingWith(document, text, headingSelector = "h1, h2, h3, h4, p, span") {
   for (const el of document.querySelectorAll(headingSelector)) {
     if (el.children.length > 0) continue;
     if ((el.textContent || "").trim() === text) return el;
@@ -112,6 +112,19 @@ describe("Profile page selectors", () => {
     expect(heading).toBeTruthy();
     expect(heading.closest("aside")).toBeTruthy();
     expect(heading.closest("main")).toBeTruthy(); // aside is inside main
+  });
+
+  it("Who your viewers also viewed heading is a <span> inside an <h3>", () => {
+    // The Premium "Who your viewers also viewed" widget wraps its title in a
+    // <span> inside an <h3>, so the <h3> is NOT a leaf — the <span> is. The
+    // marker's heading query must include `span` (and findLeafHeadingWith
+    // mirrors that) or this widget silently leaks past the suggestions toggle.
+    const heading = findLeafHeadingWith(doc, "Who your viewers also viewed");
+    expect(heading).toBeTruthy();
+    expect(heading.tagName).toBe("SPAN");
+    expect(heading.parentElement.tagName).toBe("H3");
+    // Resolves to the widget's <section> wrapper, so the marker hides the card.
+    expect(findNoiseWrapper(heading).tagName).toBe("SECTION");
   });
 
   it("Analytics heading is wrapped by a <section> (closest walk)", () => {

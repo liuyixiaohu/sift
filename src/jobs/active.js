@@ -8,9 +8,12 @@ import {
   detailHasGoodMatch,
   detailHasNoSponsorship,
   detailHasUnpaid,
+  detailMatchesCard,
   detailPanelHasReposted,
   getCardJobId,
+  getDetailJobId,
   getDetailFingerprint,
+  getDetailTitle,
   getJobCards,
   getJobTitle,
   getVisibleEl,
@@ -26,21 +29,22 @@ export function getActiveCard() {
   const cards = getJobCards();
   if (cards.length === 0) return null;
 
-  // Prefer exact match via jobId in URL (supports both link formats).
-  const urlMatch = location.href.match(/currentJobId=(\d+)/);
-  if (urlMatch) {
-    const jobId = urlMatch[1];
+  // Prefer the identity rendered inside the detail panel. LinkedIn updates the
+  // URL before replacing the old detail DOM, so URL-first matching can assign
+  // the previous job's flags to the newly-clicked card.
+  const detailJobId = getDetailJobId();
+  if (detailJobId) {
     for (const card of cards) {
-      if (getCardJobId(card) === jobId) return card;
+      if (getCardJobId(card) === detailJobId) return card;
     }
   }
 
   // Title-matching fallback:
   //   1. Exact match (identical titles) preferred
   //   2. Among substring matches, pick smallest length-diff (avoids superset mismatch)
-  const detailLink = document.querySelector('a[href*="/jobs/view/"]');
-  if (detailLink) {
-    const detailTitle = detailLink.textContent.trim().toLowerCase();
+  const renderedDetailTitle = getDetailTitle();
+  if (renderedDetailTitle) {
+    const detailTitle = renderedDetailTitle.toLowerCase();
     if (detailTitle) {
       let exactMatch = null;
       let bestCard = null;
@@ -62,6 +66,16 @@ export function getActiveCard() {
       }
       if (exactMatch) return exactMatch;
       if (bestCard) return bestCard;
+    }
+  }
+
+  // URL is a final fallback only when the rendered detail panel exposes no
+  // usable identity. It remains useful during initial page hydration.
+  const urlMatch = location.href.match(/currentJobId=(\d+)/);
+  if (urlMatch) {
+    const jobId = urlMatch[1];
+    for (const card of cards) {
+      if (getCardJobId(card) === jobId) return card;
     }
   }
 
@@ -103,6 +117,9 @@ export function clickCard(card) {
 // Scan path passes card reference directly (100% accurate); passive detection uses getActiveCard().
 // `renderLists` is injected so labels.js can poke the panel UI without depending on it.
 export function checkDetailForCard(card, { renderLists }) {
+  // The caller may hold the intended card while LinkedIn is still showing the
+  // previous card's details. Do not classify until both identities agree.
+  if (!detailMatchesCard(card)) return false;
   let labeled = false;
   if (detailPanelHasReposted()) {
     labeled = labelCard(card, "reposted") || labeled;

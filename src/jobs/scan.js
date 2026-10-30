@@ -4,7 +4,7 @@
 
 import { SCAN_DELAY_MS } from "./constants.js";
 import { state } from "./state.js";
-import { getDetailFingerprint, getJobCards } from "./dom.js";
+import { detailMatchesCard, getDetailFingerprint, getJobCards } from "./dom.js";
 import { checkDetailForCard, clickCard } from "./active.js";
 import { refreshBadges } from "./labels.js";
 import { incrementStat } from "./storage.js";
@@ -20,7 +20,7 @@ function sleep(ms) {
 
 // Resolve when the detail-panel fingerprint changes from `oldFingerprint`,
 // or after `timeoutMs`. Uses MutationObserver scoped to <main>.
-function waitForDetailChange(oldFingerprint, timeoutMs = DETAIL_LOAD_WAIT_MS) {
+function waitForDetailChange(card, oldFingerprint, timeoutMs = DETAIL_LOAD_WAIT_MS) {
   return new Promise((resolve) => {
     const detailContainer = document.querySelector("main") || document.body;
 
@@ -35,7 +35,7 @@ function waitForDetailChange(oldFingerprint, timeoutMs = DETAIL_LOAD_WAIT_MS) {
 
     const observer = new MutationObserver(() => {
       const current = getDetailFingerprint();
-      if (current && current !== oldFingerprint) settle();
+      if (current && current !== oldFingerprint && detailMatchesCard(card)) settle();
     });
 
     observer.observe(detailContainer, { childList: true, subtree: true, characterData: true });
@@ -44,7 +44,7 @@ function waitForDetailChange(oldFingerprint, timeoutMs = DETAIL_LOAD_WAIT_MS) {
 
     // Check once immediately in case the change already happened.
     const current = getDetailFingerprint();
-    if (current && current !== oldFingerprint) settle();
+    if (current && current !== oldFingerprint && detailMatchesCard(card)) settle();
   });
 }
 
@@ -72,12 +72,17 @@ export async function autoScanCards({ renderLists }) {
       const oldFp = getDetailFingerprint();
       clickCard(card);
 
-      await waitForDetailChange(oldFp);
+      await waitForDetailChange(card, oldFp);
       await sleep(POST_LOAD_SETTLE_MS);
 
       // Detect using card reference directly (bypasses getActiveCard match logic).
-      checkDetailForCard(card, { renderLists });
-      state.scannedCards.add(card);
+      // A timeout can leave the previous job rendered; checkDetailForCard's
+      // identity guard makes that a no-op, and we leave the card unscanned so
+      // a later run can retry it.
+      if (detailMatchesCard(card)) {
+        checkDetailForCard(card, { renderLists });
+        state.scannedCards.add(card);
+      }
 
       if (i < toScan.length - 1 && !state.scanAbort) {
         await sleep(SCAN_DELAY_MS);

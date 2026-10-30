@@ -156,7 +156,14 @@ export function getCardTextLines(card) {
 
 // ==================== Card Text Detectors ====================
 export function cardHasRepostedText(card) {
-  return card.textContent.toLowerCase().includes("reposted");
+  // Only trust LinkedIn's leaf metadata, not arbitrary card text. In
+  // particular, labelCard() injects a "Reposted" badge into the card; a broad
+  // textContent search would then detect our own badge forever after.
+  for (const el of card.querySelectorAll("strong, span, li, time, p")) {
+    if (el.children.length > 0 || el.closest(".lj-badges")) continue;
+    if (/^reposted(?:\s|$)/i.test(el.textContent.trim())) return true;
+  }
+  return false;
 }
 
 // Searches leaf DOM elements for textContent === "Applied".
@@ -177,10 +184,56 @@ export function cardHasAppliedText(card) {
 }
 
 // ==================== Detail Panel ====================
+export function getDetailPanel() {
+  // Never fall back to document.body. During a two-pane transition the body
+  // contains every result card, so one card's native "Reposted" text could be
+  // attributed to whichever card the URL already points at.
+  return (
+    document.querySelector(".jobs-details") ||
+    document.querySelector("main article") ||
+    document.querySelector('main [class*="job-details"]')
+  );
+}
+
+export function getDetailJobId() {
+  const detail = getDetailPanel();
+  if (!detail) return null;
+  for (const link of detail.querySelectorAll('a[href*="/jobs/view/"], a[href*="currentJobId="]')) {
+    const viewMatch = link.href.match(/\/jobs\/view\/(\d+)/);
+    if (viewMatch) return viewMatch[1];
+    try {
+      const id = new URL(link.href).searchParams.get("currentJobId");
+      if (id) return id;
+    } catch {
+      // Malformed URL — keep looking for another identity-bearing link.
+    }
+  }
+  return null;
+}
+
+export function getDetailTitle() {
+  const detail = getDetailPanel();
+  if (!detail) return "";
+  const titleLink = detail.querySelector('a[href*="/jobs/view/"], a[href*="currentJobId="]');
+  return titleLink ? titleLink.textContent.trim() : "";
+}
+
+export function detailMatchesCard(card) {
+  const cardId = getCardJobId(card);
+  const detailId = getDetailJobId();
+  if (cardId && detailId) return cardId === detailId;
+
+  // Identity links are preferred, but retain a conservative title fallback
+  // for LinkedIn cohorts that omit the job ID from the detail header.
+  const detailTitle = getDetailTitle().toLowerCase();
+  const cardTitle = getJobTitle(card).toLowerCase();
+  return Boolean(detailTitle && cardTitle && detailTitle === cardTitle);
+}
+
 export function detailPanelHasReposted() {
   // "Reposted" appears near the top of the detail panel in a <strong> or <span>.
-  const detail =
-    document.querySelector(".jobs-details") || document.querySelector("article") || document.body;
+  const detail = getDetailPanel();
+  if (!detail) return false;
   const candidates = detail.querySelectorAll("strong, span");
   for (const node of candidates) {
     if (node.children.length > 0) continue;
@@ -240,11 +293,10 @@ export function detailHasGoodMatch() {
 }
 
 export function getDetailFingerprint() {
-  const titleLink = document.querySelector('a[href*="/jobs/view/"]');
-  if (titleLink) {
-    const text = titleLink.textContent.trim();
-    if (text.length > 3) return text;
-  }
-  const text = getDetailText();
-  return text ? text.trim().substring(0, 200) : "";
+  const detail = getDetailPanel();
+  if (!detail) return "";
+  const id = getDetailJobId() || "";
+  const title = getDetailTitle();
+  const text = getDetailText().trim().substring(0, 200);
+  return [id, title, text].filter(Boolean).join("|");
 }

@@ -364,7 +364,11 @@
     return lines;
   }
   function cardHasRepostedText(card) {
-    return card.textContent.toLowerCase().includes("reposted");
+    for (const el2 of card.querySelectorAll("strong, span, li, time, p")) {
+      if (el2.children.length > 0 || el2.closest(".lj-badges")) continue;
+      if (/^reposted(?:\s|$)/i.test(el2.textContent.trim())) return true;
+    }
+    return false;
   }
   function cardHasAppliedText(card) {
     for (const el2 of card.querySelectorAll("span, li, time, p")) {
@@ -374,8 +378,40 @@
     }
     return false;
   }
+  function getDetailPanel() {
+    return document.querySelector(".jobs-details") || document.querySelector("main article") || document.querySelector('main [class*="job-details"]');
+  }
+  function getDetailJobId() {
+    const detail = getDetailPanel();
+    if (!detail) return null;
+    for (const link of detail.querySelectorAll('a[href*="/jobs/view/"], a[href*="currentJobId="]')) {
+      const viewMatch = link.href.match(/\/jobs\/view\/(\d+)/);
+      if (viewMatch) return viewMatch[1];
+      try {
+        const id = new URL(link.href).searchParams.get("currentJobId");
+        if (id) return id;
+      } catch {
+      }
+    }
+    return null;
+  }
+  function getDetailTitle() {
+    const detail = getDetailPanel();
+    if (!detail) return "";
+    const titleLink = detail.querySelector('a[href*="/jobs/view/"], a[href*="currentJobId="]');
+    return titleLink ? titleLink.textContent.trim() : "";
+  }
+  function detailMatchesCard(card) {
+    const cardId = getCardJobId(card);
+    const detailId = getDetailJobId();
+    if (cardId && detailId) return cardId === detailId;
+    const detailTitle = getDetailTitle().toLowerCase();
+    const cardTitle = getJobTitle(card).toLowerCase();
+    return Boolean(detailTitle && cardTitle && detailTitle === cardTitle);
+  }
   function detailPanelHasReposted() {
-    const detail = document.querySelector(".jobs-details") || document.querySelector("article") || document.body;
+    const detail = getDetailPanel();
+    if (!detail) return false;
     const candidates = detail.querySelectorAll("strong, span");
     for (const node of candidates) {
       if (node.children.length > 0) continue;
@@ -424,13 +460,12 @@
     return false;
   }
   function getDetailFingerprint() {
-    const titleLink = document.querySelector('a[href*="/jobs/view/"]');
-    if (titleLink) {
-      const text2 = titleLink.textContent.trim();
-      if (text2.length > 3) return text2;
-    }
-    const text = getDetailText();
-    return text ? text.trim().substring(0, 200) : "";
+    const detail = getDetailPanel();
+    if (!detail) return "";
+    const id = getDetailJobId() || "";
+    const title = getDetailTitle();
+    const text = getDetailText().trim().substring(0, 200);
+    return [id, title, text].filter(Boolean).join("|");
   }
 
   // src/jobs/labels.js
@@ -644,16 +679,15 @@
     clearCardTextCache();
     const cards = getJobCards();
     if (cards.length === 0) return null;
-    const urlMatch = location.href.match(/currentJobId=(\d+)/);
-    if (urlMatch) {
-      const jobId = urlMatch[1];
+    const detailJobId = getDetailJobId();
+    if (detailJobId) {
       for (const card of cards) {
-        if (getCardJobId(card) === jobId) return card;
+        if (getCardJobId(card) === detailJobId) return card;
       }
     }
-    const detailLink = document.querySelector('a[href*="/jobs/view/"]');
-    if (detailLink) {
-      const detailTitle = detailLink.textContent.trim().toLowerCase();
+    const renderedDetailTitle = getDetailTitle();
+    if (renderedDetailTitle) {
+      const detailTitle = renderedDetailTitle.toLowerCase();
       if (detailTitle) {
         let exactMatch = null;
         let bestCard = null;
@@ -675,6 +709,13 @@
         }
         if (exactMatch) return exactMatch;
         if (bestCard) return bestCard;
+      }
+    }
+    const urlMatch = location.href.match(/currentJobId=(\d+)/);
+    if (urlMatch) {
+      const jobId = urlMatch[1];
+      for (const card of cards) {
+        if (getCardJobId(card) === jobId) return card;
       }
     }
     return null;
@@ -707,6 +748,7 @@
     );
   }
   function checkDetailForCard(card, { renderLists: renderLists2 }) {
+    if (!detailMatchesCard(card)) return false;
     let labeled = false;
     if (detailPanelHasReposted()) {
       labeled = labelCard(card, "reposted") || labeled;
@@ -752,7 +794,7 @@
   function sleep(ms) {
     return new Promise((r) => setTimeout(r, ms));
   }
-  function waitForDetailChange(oldFingerprint, timeoutMs = DETAIL_LOAD_WAIT_MS) {
+  function waitForDetailChange(card, oldFingerprint, timeoutMs = DETAIL_LOAD_WAIT_MS) {
     return new Promise((resolve) => {
       const detailContainer = document.querySelector("main") || document.body;
       let settled = false;
@@ -765,12 +807,12 @@
       }
       const observer = new MutationObserver(() => {
         const current2 = getDetailFingerprint();
-        if (current2 && current2 !== oldFingerprint) settle();
+        if (current2 && current2 !== oldFingerprint && detailMatchesCard(card)) settle();
       });
       observer.observe(detailContainer, { childList: true, subtree: true, characterData: true });
       const timeout = setTimeout(settle, timeoutMs);
       const current = getDetailFingerprint();
-      if (current && current !== oldFingerprint) settle();
+      if (current && current !== oldFingerprint && detailMatchesCard(card)) settle();
     });
   }
   async function autoScanCards({ renderLists: renderLists2 }) {
@@ -792,10 +834,12 @@
         updateScanButton("Scanning " + (i + 1) + "/" + total2 + "...", (i + 1) / total2 * 100);
         const oldFp = getDetailFingerprint();
         clickCard(card);
-        await waitForDetailChange(oldFp);
+        await waitForDetailChange(card, oldFp);
         await sleep(POST_LOAD_SETTLE_MS);
-        checkDetailForCard(card, { renderLists: renderLists2 });
-        state.scannedCards.add(card);
+        if (detailMatchesCard(card)) {
+          checkDetailForCard(card, { renderLists: renderLists2 });
+          state.scannedCards.add(card);
+        }
         if (i < toScan.length - 1 && !state.scanAbort) {
           await sleep(SCAN_DELAY_MS);
         }
